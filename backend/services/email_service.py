@@ -55,7 +55,10 @@ async def send_verification_email(to: str, name: str, token: str):
     """
     
     if not settings.RESEND_API_KEY:
-        _mock_email(to, subject)
+        logger.info(f"📧 VERIFICATION EMAIL (Development Mode)")
+        logger.info(f"   To: {to}")
+        logger.info(f"   Subject: {subject}")
+        logger.info(f"   Verification Link: {settings.FRONTEND_URL}/verify-email?token={token}")
         return
     
     try:
@@ -71,10 +74,13 @@ async def send_verification_email(to: str, name: str, token: str):
                 }
             )
             response.raise_for_status()
-            logger.info(f"Verification email sent to {to}")
+            logger.info(f"✅ Verification email sent to {to}")
     except Exception as e:
-        logger.error(f"Failed to send verification email: {e}")
-        _mock_email(to, subject)
+        logger.error(f"Failed to send email via Resend (status 403 usually means invalid API key)")
+        logger.info(f"📧 VERIFICATION EMAIL (Fallback - Development Mode)")
+        logger.info(f"   To: {to}")
+        logger.info(f"   Subject: {subject}")
+        logger.info(f"   Verification Link: {settings.FRONTEND_URL}/verify-email?token={token}")
 
 
 async def send_password_reset_email(to: str, name: str, token: str):
@@ -125,7 +131,10 @@ async def send_password_reset_email(to: str, name: str, token: str):
     """
     
     if not settings.RESEND_API_KEY:
-        _mock_email(to, subject)
+        logger.info(f"📧 PASSWORD RESET EMAIL (Development Mode)")
+        logger.info(f"   To: {to}")
+        logger.info(f"   Subject: {subject}")
+        logger.info(f"   Reset Link: {settings.FRONTEND_URL}/reset-password?token={token}")
         return
     
     try:
@@ -141,10 +150,13 @@ async def send_password_reset_email(to: str, name: str, token: str):
                 }
             )
             response.raise_for_status()
-            logger.info(f"Password reset email sent to {to}")
+            logger.info(f"✅ Password reset email sent to {to}")
     except Exception as e:
-        logger.error(f"Failed to send password reset email: {e}")
-        _mock_email(to, subject)
+        logger.error(f"Failed to send email via Resend (status 403 usually means invalid API key)")
+        logger.info(f"📧 PASSWORD RESET EMAIL (Fallback - Development Mode)")
+        logger.info(f"   To: {to}")
+        logger.info(f"   Subject: {subject}")
+        logger.info(f"   Reset Link: {settings.FRONTEND_URL}/reset-password?token={token}")
 
 
 async def send_welcome_email(to: str, name: str, provider: str):
