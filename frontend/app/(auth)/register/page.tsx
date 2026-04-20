@@ -78,7 +78,8 @@ export default function RegisterPage() {
         setError(data.detail || 'Registration failed');
       }
     } catch (err) {
-      setError('An error occurred. Please try again.');
+      console.error('Registration error:', err);
+      setError(`An error occurred: ${err instanceof Error ? err.message : 'Unknown error'}`);
     } finally {
       setLoading(false);
     }

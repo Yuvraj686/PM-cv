@@ -28,32 +28,38 @@ async def register(
     db: AsyncSession = Depends(get_db)
 ):
     """Register a new user with email and password."""
-    # Check if email exists
-    result = await db.execute(select(User).where(User.email == req.email))
-    if result.scalar_one_or_none():
-        raise HTTPException(status_code=400, detail="An account with this email already exists")
-    
-    # Create user
-    verify_token = generate_secure_token()
-    verify_token_exp = datetime.utcnow() + timedelta(hours=24)
-    
-    user = User(
-        name=req.name,
-        email=req.email,
-        hashed_password=hash_password(req.password),
-        auth_provider="email",
-        is_verified=False,
-        verify_token=verify_token,
-        verify_token_exp=verify_token_exp
-    )
-    db.add(user)
-    await db.commit()
-    await db.refresh(user)
-    
-    # Send verification email via background task
-    bg_tasks.add_task(send_verification_email, req.email, req.name, verify_token)
-    
-    return {"message": "Check your email to verify your account", "email": user.email}
+    try:
+        # Check if email exists
+        result = await db.execute(select(User).where(User.email == req.email))
+        if result.scalar_one_or_none():
+            raise HTTPException(status_code=400, detail="An account with this email already exists")
+        
+        # Create user
+        verify_token = generate_secure_token()
+        verify_token_exp = datetime.utcnow() + timedelta(hours=24)
+        
+        user = User(
+            name=req.name,
+            email=req.email,
+            hashed_password=hash_password(req.password),
+            auth_provider="email",
+            is_verified=False,
+            verify_token=verify_token,
+            verify_token_exp=verify_token_exp
+        )
+        db.add(user)
+        await db.commit()
+        await db.refresh(user)
+        
+        # Send verification email via background task
+        bg_tasks.add_task(send_verification_email, req.email, req.name, verify_token)
+        
+        return {"message": "Check your email to verify your account", "email": user.email}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Registration error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Registration failed. Please try again.")
 
 
 @router.get("/verify-email")
