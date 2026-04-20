@@ -25,3 +25,7 @@ dist/
 build/
 .next/
 out/
+
+# Celery
+celerybeat-schedule*
+*.log
