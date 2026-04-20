@@ -1,0 +1,216 @@
+from datetime import datetime, date
+from uuid import UUID
+from pydantic import BaseModel, EmailStr, field_validator
+
+
+# ─── Auth Schemas ──────────────────────────────────────────────────────────────
+
+class UserRegister(BaseModel):
+    name: str
+    email: EmailStr
+    password: str
+
+    @field_validator("password")
+    @classmethod
+    def password_strength(cls, v: str) -> str:
+        if len(v) < 8:
+            raise ValueError("Password must be at least 8 characters")
+        return v
+
+
+class UserLogin(BaseModel):
+    email: EmailStr
+    password: str
+
+
+class TokenResponse(BaseModel):
+    access_token: str
+    refresh_token: str
+    token_type: str = "bearer"
+
+
+class RefreshRequest(BaseModel):
+    refresh_token: str
+
+
+# ─── User Schemas ──────────────────────────────────────────────────────────────
+
+class UserOut(BaseModel):
+    id: UUID
+    name: str
+    email: str
+    avatar_url: str | None
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class UserUpdate(BaseModel):
+    name: str | None = None
+    avatar_url: str | None = None
+
+
+# ─── Project Schemas ───────────────────────────────────────────────────────────
+
+class ProjectCreate(BaseModel):
+    name: str
+    description: str | None = None
+    repo_url: str | None = None
+    deadline: str | None = None  # ISO date string YYYY-MM-DD
+
+
+class ProjectUpdate(BaseModel):
+    name: str | None = None
+    description: str | None = None
+    repo_url: str | None = None
+    deadline: str | None = None
+
+
+class ProjectOut(BaseModel):
+    id: UUID
+    name: str
+    description: str | None
+    repo_url: str | None
+    deadline: date | None
+    owner_id: UUID
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class MemberAdd(BaseModel):
+    user_id: str | None = None
+    email: EmailStr | None = None
+    role: str = "developer"
+
+
+class MemberRoleUpdate(BaseModel):
+    role: str
+
+
+class MemberOut(BaseModel):
+    user_id: UUID
+    role: str
+    user: UserOut
+
+    model_config = {"from_attributes": True}
+
+
+# ─── Task Schemas ──────────────────────────────────────────────────────────────
+
+class TaskCreate(BaseModel):
+    project_id: str
+    title: str
+    description: str | None = None
+    status: str = "todo"
+    priority: str = "medium"
+    assignee_id: str | None = None
+    due_date: str | None = None
+    position: int = 0
+
+
+class TaskUpdate(BaseModel):
+    title: str | None = None
+    description: str | None = None
+    status: str | None = None
+    priority: str | None = None
+    assignee_id: str | None = None
+    due_date: str | None = None
+    position: int | None = None
+
+
+class TaskStatusUpdate(BaseModel):
+    status: str
+    position: int | None = None
+
+
+class TaskOut(BaseModel):
+    id: UUID
+    project_id: UUID
+    title: str
+    description: str | None
+    status: str
+    priority: str
+    assignee_id: UUID | None
+    due_date: date | None
+    alert_sent: bool
+    external_id: str | None
+    external_source: str | None
+    position: int
+    created_at: datetime
+    updated_at: datetime
+    assignee: UserOut | None = None
+
+    model_config = {"from_attributes": True}
+
+
+# ─── Chat Schemas ──────────────────────────────────────────────────────────────
+
+class ChannelCreate(BaseModel):
+    project_id: str | None = None
+    name: str | None = None
+    type: str = "group"
+    member_ids: list[str] = []
+
+
+class ChannelOut(BaseModel):
+    id: UUID
+    project_id: UUID | None
+    name: str | None
+    type: str
+    room_id: str
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class MessageOut(BaseModel):
+    id: UUID
+    channel_id: UUID
+    sender_id: UUID | None
+    content: str
+    message_type: str
+    created_at: datetime
+    sender: UserOut | None = None
+
+    model_config = {"from_attributes": True}
+
+
+# ─── AI Schemas ────────────────────────────────────────────────────────────────
+
+class AIChatMessage(BaseModel):
+    role: str  # user|assistant
+    content: str
+
+
+class AIChatRequest(BaseModel):
+    message: str
+    history: list[AIChatMessage] = []
+
+
+# ─── Commit Schemas ────────────────────────────────────────────────────────────
+
+class CommitOut(BaseModel):
+    id: UUID
+    project_id: UUID
+    sha: str
+    author_name: str | None
+    commit_messages: list | None
+    file_changes: list | None
+    ai_summary: str | None
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+# ─── Notification Schemas ──────────────────────────────────────────────────────
+
+class NotificationOut(BaseModel):
+    id: UUID
+    user_id: UUID
+    type: str
+    content: str
+    read: bool
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
