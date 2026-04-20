@@ -19,6 +19,8 @@ class RegisterEmailRequest(BaseModel):
     def strong_password(cls, v):
         if len(v) < 8:
             raise ValueError("Minimum 8 characters")
+        if len(v) > 72:
+            raise ValueError("Maximum 72 characters (bcrypt limitation)")
         if not re.search(r"[A-Z]", v):
             raise ValueError("Must contain an uppercase letter")
         if not re.search(r"[0-9]", v):

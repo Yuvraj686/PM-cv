@@ -7,10 +7,15 @@ import secrets, random, string
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 def hash_password(password: str) -> str:
-    return pwd_context.hash(password)
+    # Bcrypt has a 72-byte limit for passwords
+    # Truncate to 72 bytes to prevent errors
+    truncated_password = password[:72]
+    return pwd_context.hash(truncated_password)
 
 def verify_password(plain: str, hashed: str) -> bool:
-    return pwd_context.verify(plain, hashed)
+    # Truncate plain password to 72 bytes to match hashing
+    truncated_password = plain[:72]
+    return pwd_context.verify(truncated_password, hashed)
 
 def create_access_token(data: dict) -> str:
     payload = {**data, "exp": datetime.utcnow() + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES), "type": "access"}
