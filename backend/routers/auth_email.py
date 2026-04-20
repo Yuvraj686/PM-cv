@@ -51,6 +51,8 @@ async def register(
         await db.commit()
         await db.refresh(user)
         
+        logger.info(f"User registered successfully: {user.email}")
+        
         # Send verification email via background task
         bg_tasks.add_task(send_verification_email, req.email, req.name, verify_token)
         
@@ -58,8 +60,8 @@ async def register(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Registration error: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail="Registration failed. Please try again.")
+        logger.exception(f"Registration error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Registration failed: {str(e)}")
 
 
 @router.get("/verify-email")
