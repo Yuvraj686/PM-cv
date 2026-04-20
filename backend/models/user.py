@@ -33,3 +33,7 @@ class User(Base):
 
     # Relationships
     owned_projects = relationship("Project", back_populates="owner", foreign_keys="Project.owner_id")
+    memberships = relationship("ProjectMember", back_populates="user")
+    sent_messages = relationship("Message", back_populates="sender")
+    notifications = relationship("Notification", back_populates="user")
+    assigned_tasks = relationship("Task", back_populates="assignee", foreign_keys="Task.assignee_id")
