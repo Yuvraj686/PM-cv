@@ -24,7 +24,7 @@ async def google_auth():
     """Redirect to Google OAuth login."""
     params = {
         "client_id": settings.GOOGLE_CLIENT_ID,
-        "redirect_uri": f"{settings.FRONTEND_URL}/api/auth/google/callback",
+        "redirect_uri": settings.GOOGLE_REDIRECT_URI,
         "response_type": "code",
         "scope": "openid email profile",
         "access_type": "offline",
@@ -48,7 +48,7 @@ async def google_callback(
             "code": code,
             "client_id": settings.GOOGLE_CLIENT_ID,
             "client_secret": settings.GOOGLE_CLIENT_SECRET,
-            "redirect_uri": f"{settings.FRONTEND_URL}/api/auth/google/callback",
+            "redirect_uri": settings.GOOGLE_REDIRECT_URI,
             "grant_type": "authorization_code"
         }
         
