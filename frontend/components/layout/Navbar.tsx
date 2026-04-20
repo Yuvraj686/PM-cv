@@ -1,12 +1,15 @@
 'use client';
 
-import { Bell, Search } from 'lucide-react';
+import { Bell, Search, LogOut } from 'lucide-react';
 import { useAuthStore } from '@/lib/store';
+import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { toast } from 'sonner';
+import { clearTokens } from '@/lib/auth';
 
 export function Navbar() {
+  const router = useRouter();
   const user = useAuthStore((state) => state.user);
   const token = useAuthStore((state) => state.accessToken);
   const [unreadCounts, setUnreadCounts] = useState(0);
@@ -41,6 +44,13 @@ export function Navbar() {
     return () => ws.close();
   }, [user, token]);
 
+  const handleLogout = () => {
+    clearTokens();
+    useAuthStore.getState().logout();
+    document.cookie = 'access_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC;';
+    router.push('/login');
+  };
+
   return (
     <header className="h-16 bg-black/20 backdrop-blur-md border-b border-white/10 flex items-center justify-between px-6 sticky top-0 z-10">
       <div className="flex-1 max-w-md relative">
@@ -60,6 +70,15 @@ export function Navbar() {
               {unreadCounts}
             </span>
           )}
+        </button>
+
+        <button
+          data-testid="logout-btn"
+          onClick={handleLogout}
+          className="text-gray-400 hover:text-white transition-colors"
+          title="Logout"
+        >
+          <LogOut className="w-5 h-5" />
         </button>
 
         <div className="flex items-center space-x-3 border-l border-white/10 pl-6 cursor-pointer">

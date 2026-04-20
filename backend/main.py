@@ -5,9 +5,18 @@ from fastapi.middleware.cors import CORSMiddleware
 from core.config import settings
 from core.database import create_tables
 from routers import auth, projects, tasks, users, chat, ai, github, notifications
+from routers.auth_email import router as email_router
+from routers.auth_google import router as google_router
+from routers.auth_github import router as github_oauth_router
+from routers.auth_phone import router as phone_router
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# Rate limiter setup
+limiter = Limiter(key_func=get_remote_address)
 
 
 @asynccontextmanager
@@ -26,6 +35,9 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+# Add rate limiter to app state
+app.state.limiter = limiter
+
 # CORS — allow frontend origin
 app.add_middleware(
     CORSMiddleware,
@@ -41,6 +53,10 @@ app.add_middleware(
 
 # Register all routers
 app.include_router(auth.router)
+app.include_router(email_router, prefix="/api/auth", tags=["Email Auth"])
+app.include_router(google_router, prefix="/api/auth", tags=["Google OAuth"])
+app.include_router(github_oauth_router, prefix="/api/auth", tags=["GitHub OAuth"])
+app.include_router(phone_router, prefix="/api/auth", tags=["Phone OTP"])
 app.include_router(projects.router)
 app.include_router(tasks.router)
 app.include_router(users.router)
@@ -57,4 +73,4 @@ async def root():
 
 @app.get("/health")
 async def health():
-    return {"status": "healthy"}
+    return {"status": "ok", "service": "ProjectHub API"}

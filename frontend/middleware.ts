@@ -1,29 +1,25 @@
-import { NextResponse } from 'next/server';
-import type { NextRequest } from 'next/server';
+import { NextResponse } from "next/server"
+import type { NextRequest } from "next/server"
 
-const PUBLIC_PATHS = new Set(['/login', '/register']);
-const AUTH_COOKIE_NAME = 'projecthub_access_token';
+const PROTECTED = ["/dashboard", "/projects", "/settings"]
+const PUBLIC = ["/login", "/register", "/verify-email", "/forgot-password", "/reset-password", "/auth/callback"]
 
 export function middleware(request: NextRequest) {
-  const path = request.nextUrl.pathname;
-  const isPublicPath = PUBLIC_PATHS.has(path);
-  const accessToken = request.cookies.get(AUTH_COOKIE_NAME)?.value;
+  const { pathname } = request.nextUrl
+  const token = request.cookies.get("access_token")?.value
 
-  if (!accessToken && !isPublicPath) {
-    const loginUrl = new URL('/login', request.url);
-    loginUrl.searchParams.set('next', path);
-    return NextResponse.redirect(loginUrl);
+  const isProtected = PROTECTED.some((p) => pathname.startsWith(p))
+  const isPublic = PUBLIC.some((p) => pathname.startsWith(p))
+
+  if (isProtected && !token) {
+    return NextResponse.redirect(new URL("/login", request.url))
   }
-
-  if (accessToken && isPublicPath) {
-    return NextResponse.redirect(new URL('/dashboard', request.url));
+  if (isPublic && token) {
+    return NextResponse.redirect(new URL("/dashboard", request.url))
   }
-
-  return NextResponse.next();
+  return NextResponse.next()
 }
 
 export const config = {
-  matcher: [
-    '/((?!api|_next/static|_next/image|favicon.ico).*)',
-  ],
-};
+  matcher: ["/((?!api|_next/static|_next/image|favicon.ico).*)"],
+}
