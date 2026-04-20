@@ -32,9 +32,20 @@ class Settings(BaseSettings):
     FRONTEND_URL: str = "http://localhost:3000"
     APP_NAME: str = "ProjectHub"
 
+    # Google OAuth (optional)
+    GOOGLE_CLIENT_ID: str = ""
+    GOOGLE_CLIENT_SECRET: str = ""
+    GOOGLE_REDIRECT_URI: str = "http://localhost:8000/api/auth/google/callback"
+
     # GitHub OAuth (optional)
     GITHUB_CLIENT_ID: str = ""
     GITHUB_CLIENT_SECRET: str = ""
+    GITHUB_REDIRECT_URI: str = "http://localhost:8000/api/auth/github/callback"
+
+    # Twilio (SMS/Phone OTP)
+    TWILIO_ACCOUNT_SID: str = ""
+    TWILIO_AUTH_TOKEN: str = ""
+    TWILIO_PHONE_NUMBER: str = ""
 
 
 @lru_cache()
