@@ -37,9 +37,12 @@ class RefreshRequest(BaseModel):
 
 class UserOut(BaseModel):
     id: UUID
-    name: str
-    email: str
+    name: str | None
+    username: str | None
+    email: str | None
     avatar_url: str | None
+    github_username: str | None
+    onboarding_complete: bool
     created_at: datetime
 
     model_config = {"from_attributes": True}
@@ -48,6 +51,24 @@ class UserOut(BaseModel):
 class UserUpdate(BaseModel):
     name: str | None = None
     avatar_url: str | None = None
+
+
+class OnboardingSetup(BaseModel):
+    username: str
+    github_username: str | None = None
+
+    @field_validator("username")
+    @classmethod
+    def username_format(cls, v: str) -> str:
+        import re
+        v = v.strip().lower()
+        if len(v) < 3:
+            raise ValueError("Username must be at least 3 characters")
+        if len(v) > 30:
+            raise ValueError("Username must be at most 30 characters")
+        if not re.match(r'^[a-z0-9_\-]+$', v):
+            raise ValueError("Username can only contain letters, numbers, underscores, and hyphens")
+        return v
 
 
 # ─── Project Schemas ───────────────────────────────────────────────────────────

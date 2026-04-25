@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { Save, Trash2, Github, AlertTriangle, Loader2, Calendar } from 'lucide-react';
-import { api } from '@/lib/api';
+import api from '@/lib/api';
 import { useAuthStore } from '@/lib/store';
 
 export default function SettingsPage() {

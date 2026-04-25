@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams } from 'next/navigation';
 import { Send, Bot, User, Loader2 } from 'lucide-react';
-import { api } from '@/lib/api';
+import api from '@/lib/api';
 import { useAuthStore } from '@/lib/store';
 import { motion, AnimatePresence } from 'framer-motion';
 

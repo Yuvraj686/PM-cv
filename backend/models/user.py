@@ -9,6 +9,7 @@ class User(Base):
     __tablename__ = "users"
     id                     = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     name                   = Column(String(100), nullable=True)
+    username               = Column(String(50), unique=True, nullable=True, index=True)
     email                  = Column(String(255), unique=True, nullable=True, index=True)
     hashed_password        = Column(String(255), nullable=True)
     avatar_url             = Column(Text, nullable=True)
@@ -28,6 +29,7 @@ class User(Base):
     phone_otp_locked_until = Column(DateTime, nullable=True)
     phone_verified         = Column(Boolean, default=False)
     is_active              = Column(Boolean, default=True)
+    onboarding_complete    = Column(Boolean, default=False)
     created_at             = Column(DateTime, default=datetime.utcnow)
     last_login             = Column(DateTime, nullable=True)
 

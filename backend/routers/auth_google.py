@@ -115,13 +115,20 @@ async def google_callback(
                 
                 # Send welcome email
                 bg_tasks.add_task(send_welcome_email, email, name, "google")
+                is_new_user = True
         
         # Step 4: Issue JWT tokens
         access_jwt = create_access_token({"sub": str(user.id), "email": user.email})
         refresh_jwt = create_refresh_token({"sub": str(user.id), "email": user.email})
         
         # Step 5: Redirect to frontend with tokens
-        callback_url = f"{settings.FRONTEND_URL}/auth/callback?access_token={access_jwt}&refresh_token={refresh_jwt}"
+        # New users who haven't set a username yet go to onboarding
+        needs_onboarding = not user.onboarding_complete
+        callback_url = (
+            f"{settings.FRONTEND_URL}/auth/callback"
+            f"?access_token={access_jwt}&refresh_token={refresh_jwt}"
+            f"&needs_onboarding={'true' if needs_onboarding else 'false'}"
+        )
         return RedirectResponse(url=callback_url)
     
     except Exception as e:

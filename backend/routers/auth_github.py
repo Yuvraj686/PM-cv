@@ -25,7 +25,7 @@ async def github_auth():
     """Redirect to GitHub OAuth login."""
     params = {
         "client_id": settings.GITHUB_CLIENT_ID,
-        "redirect_uri": f"{settings.FRONTEND_URL}/api/auth/github/callback",
+        "redirect_uri": settings.GITHUB_REDIRECT_URI,
         "scope": "read:user user:email"
     }
     
@@ -147,7 +147,13 @@ async def github_callback(
         refresh_jwt = create_refresh_token({"sub": str(user.id), "email": user.email})
         
         # Step 5: Redirect to frontend with tokens
-        callback_url = f"{settings.FRONTEND_URL}/auth/callback?access_token={access_jwt}&refresh_token={refresh_jwt}"
+        # New users who haven't set a username yet go to onboarding
+        needs_onboarding = not user.onboarding_complete
+        callback_url = (
+            f"{settings.FRONTEND_URL}/auth/callback"
+            f"?access_token={access_jwt}&refresh_token={refresh_jwt}"
+            f"&needs_onboarding={'true' if needs_onboarding else 'false'}"
+        )
         return RedirectResponse(url=callback_url)
     
     except Exception as e:

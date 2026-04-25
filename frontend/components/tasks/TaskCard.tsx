@@ -1,6 +1,20 @@
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { Calendar, AlignLeft, Pencil, Trash2 } from 'lucide-react';
+import { Calendar, Pencil, Trash2 } from 'lucide-react';
+
+const TAG_COLORS: Record<string, { bg: string; color: string }> = {
+  critical: { bg: '#FDEEE9', color: '#E07A5F' },
+  high:     { bg: '#FDF6E3', color: '#9b7a28' },
+  medium:   { bg: '#EDF4EC', color: '#4a8a46' },
+  low:      { bg: '#F0EDE8', color: '#6b6460' },
+};
+
+const AVATAR_COLORS = ['#E07A5F','#8DB88A','#C9A84C','#9B8EC4','#7A8FA6'];
+function avatarColor(name: string) {
+  let h = 0;
+  for (let i = 0; i < name.length; i++) h += name.charCodeAt(i);
+  return AVATAR_COLORS[h % AVATAR_COLORS.length];
+}
 
 export function TaskCard({
   task,
@@ -9,40 +23,26 @@ export function TaskCard({
   canDelete,
   canEdit,
 }: {
-  task: any,
-  onEdit?: () => void,
-  onDelete?: () => void,
-  canDelete?: boolean,
-  canEdit?: boolean,
+  task: any;
+  onEdit?: () => void;
+  onDelete?: () => void;
+  canDelete?: boolean;
+  canEdit?: boolean;
 }) {
   const { setNodeRef, attributes, listeners, transform, transition, isDragging } = useSortable({
     id: task.id,
-    data: {
-      type: 'Task',
-      task,
-    },
+    data: { type: 'Task', task },
   });
 
-  const style = {
-    transition,
-    transform: CSS.Transform.toString(transform),
-  };
-
-  const priorityColors = {
-    low: 'bg-gray-500/20 text-gray-400 border-gray-500/20',
-    medium: 'bg-blue-500/20 text-blue-400 border-blue-500/20',
-    high: 'bg-amber-500/20 text-amber-500 border-amber-500/20',
-    critical: 'bg-red-500/20 text-red-500 border-red-500/20',
-  };
-
-  const priorityColor = priorityColors[task.priority as keyof typeof priorityColors] || priorityColors.medium;
+  const style = { transition, transform: CSS.Transform.toString(transform) };
+  const tag = TAG_COLORS[task.priority] || TAG_COLORS.medium;
 
   if (isDragging) {
     return (
-      <div 
-        ref={setNodeRef} 
-        style={style} 
-        className="glass-panel p-4 rounded-xl border border-indigo-500/50 opacity-40 shadow-2xl h-32" 
+      <div
+        ref={setNodeRef}
+        style={style}
+        className="kanban-card opacity-40 h-24"
       />
     );
   }
@@ -53,68 +53,63 @@ export function TaskCard({
       style={style}
       {...attributes}
       {...listeners}
-      className={`glass-panel p-4 rounded-xl cursor-grab active:cursor-grabbing hover:border-white/20 transition-colors group relative overflow-hidden`}
+      className="kanban-card group"
     >
-      {/* Priority accent bar */}
-      <div className={`absolute left-0 top-0 bottom-0 w-1 ${
-        task.priority === 'critical' ? 'bg-red-500' :
-        task.priority === 'high' ? 'bg-amber-500' :
-        task.priority === 'medium' ? 'bg-blue-500' : 'bg-gray-500'
-      }`} />
-      
-      <div className="flex justify-between items-start mb-2">
-        <span className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded border ${priorityColor}`}>
+      {/* Priority tag */}
+      <div className="flex items-center justify-between mb-2.5">
+        <span
+          className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md"
+          style={{ background: tag.bg, color: tag.color }}
+        >
           {task.priority}
         </span>
-        
         {task.assignee && (
-          <div className="w-6 h-6 rounded-full bg-gradient-to-tr from-indigo-500 to-purple-500 flex items-center justify-center text-[10px] font-bold text-white shadow-sm border border-white/20" title={task.assignee.name}>
+          <div
+            className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold text-white"
+            style={{ background: avatarColor(task.assignee.name) }}
+            title={task.assignee.name}
+          >
             {task.assignee.name.charAt(0)}
           </div>
         )}
       </div>
-      
-      <h3 className="font-medium text-sm text-gray-100 group-hover:text-indigo-300 transition-colors line-clamp-2">
+
+      {/* Title */}
+      <h3 className="text-sm font-medium leading-snug mb-2 line-clamp-2" style={{ color: 'var(--bloom-text)' }}>
         {task.title}
       </h3>
-      
-      {task.description && (
-        <div className="mt-2 flex items-center text-gray-500">
-          <AlignLeft size={12} className="mr-1" />
-        </div>
-      )}
-      
+
+      {/* Due date */}
       {task.due_date && (
-        <div className="mt-3 inline-flex items-center text-[11px] font-medium text-gray-400 bg-black/20 self-start px-2 py-1 rounded-md border border-white/5">
-          <Calendar size={12} className="mr-1.5 opacity-70" />
+        <div
+          className="inline-flex items-center gap-1 text-[11px] mt-1 px-2 py-1 rounded-lg"
+          style={{ background: 'var(--bloom-bg)', color: 'var(--bloom-muted)' }}
+        >
+          <Calendar size={11} />
           {new Date(task.due_date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
         </div>
       )}
 
+      {/* Actions */}
       {(canEdit || canDelete) && (
-        <div className="mt-3 flex items-center gap-2">
+        <div className="mt-2.5 flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
           {canEdit && (
             <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onEdit?.();
-              }}
-              className="text-xs px-2 py-1 rounded bg-white/10 hover:bg-white/20 flex items-center gap-1"
+              onClick={(e) => { e.stopPropagation(); onEdit?.(); }}
+              className="flex items-center gap-1 text-xs px-2 py-1 rounded-lg transition-colors hover:bg-black/5"
+              style={{ color: 'var(--bloom-muted)' }}
             >
-              <Pencil size={12} />
+              <Pencil size={11} />
               Edit
             </button>
           )}
           {canDelete && (
             <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onDelete?.();
-              }}
-              className="text-xs px-2 py-1 rounded bg-red-500/20 text-red-300 hover:bg-red-500/30 flex items-center gap-1"
+              onClick={(e) => { e.stopPropagation(); onDelete?.(); }}
+              className="flex items-center gap-1 text-xs px-2 py-1 rounded-lg transition-colors"
+              style={{ color: 'var(--bloom-coral)', background: 'var(--bloom-coral-bg)' }}
             >
-              <Trash2 size={12} />
-              Delete
+              <Trash2 size={11} />
             </button>
           )}
         </div>

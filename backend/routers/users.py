@@ -5,7 +5,7 @@ from sqlalchemy import select
 from core.database import get_db
 from core.dependencies import get_current_user
 from models.user import User
-from schemas.schemas import UserOut, UserUpdate
+from schemas.schemas import UserOut, UserUpdate, OnboardingSetup
 
 router = APIRouter(prefix="/api/users", tags=["users"])
 
@@ -27,13 +27,45 @@ async def update_profile(payload: UserUpdate, current_user: CurrentUser, db: DB)
     return current_user
 
 
+@router.post("/me/onboarding", response_model=UserOut)
+async def complete_onboarding(payload: OnboardingSetup, current_user: CurrentUser, db: DB):
+    """Complete the onboarding flow — set username and optional GitHub handle."""
+    # Check username uniqueness
+    result = await db.execute(select(User).where(User.username == payload.username))
+    existing = result.scalar_one_or_none()
+    if existing and existing.id != current_user.id:
+        raise HTTPException(status_code=409, detail="Username already taken")
+
+    current_user.username = payload.username
+    if payload.github_username:
+        current_user.github_username = payload.github_username
+    current_user.onboarding_complete = True
+    await db.commit()
+    await db.refresh(current_user)
+    return current_user
+
+
+@router.get("/check-username")
+async def check_username(username: str, current_user: CurrentUser, db: DB):
+    """Returns {available: bool} for real-time username availability check."""
+    import re
+    username = username.strip().lower()
+    if not re.match(r'^[a-z0-9_\-]+$', username) or len(username) < 3 or len(username) > 30:
+        return {"available": False, "reason": "invalid_format"}
+    result = await db.execute(select(User).where(User.username == username))
+    existing = result.scalar_one_or_none()
+    if existing and existing.id != current_user.id:
+        return {"available": False, "reason": "taken"}
+    return {"available": True}
+
+
 @router.get("/search")
 async def search_users(q: str, current_user: CurrentUser, db: DB):
     """Search users by email or name — for adding members."""
     result = await db.execute(
         select(User)
         .where(
-            (User.email.ilike(f"%{q}%")) | (User.name.ilike(f"%{q}%"))
+            (User.email.ilike(f"%{q}%")) | (User.name.ilike(f"%{q}%")) | (User.username.ilike(f"%{q}%"))
         )
         .limit(10)
     )

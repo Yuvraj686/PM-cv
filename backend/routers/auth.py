@@ -41,7 +41,10 @@ async def login(payload: UserLogin, db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(User).where(User.email == normalized_email))
     user = result.scalar_one_or_none()
 
-    if not user or not user.hashed_password:
+    if not user:
+        raise HTTPException(status_code=404, detail="Email is not registered")
+
+    if not user.hashed_password:
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
     if not verify_password(payload.password, user.hashed_password):

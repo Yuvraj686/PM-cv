@@ -1,15 +1,11 @@
 import type { Metadata } from 'next';
-import { Inter } from 'next/font/google';
 import './globals.css';
-
-const inter = Inter({ subsets: ['latin'], variable: '--font-sans' });
+import { Toaster } from 'sonner';
 
 export const metadata: Metadata = {
   title: 'ProjectHub',
-  description: 'Premium SaaS project management',
+  description: 'Collaborative project management',
 };
-
-import { Toaster } from 'sonner';
 
 export default function RootLayout({
   children,
@@ -17,10 +13,30 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="dark">
-      <body className={`${inter.variable} font-sans antialiased bg-background text-foreground`}>
+    <html lang="en">
+      <head>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link
+          href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Inter:wght@300;400;500;600;700&display=swap"
+          rel="stylesheet"
+        />
+      </head>
+      <body style={{ fontFamily: "'Inter', sans-serif" }}>
         {children}
-        <Toaster position="top-right" theme="dark" richColors />
+        <Toaster
+          position="bottom-right"
+          theme="light"
+          richColors
+          toastOptions={{
+            style: {
+              background: 'var(--bloom-surface)',
+              border: '1px solid var(--bloom-border)',
+              color: 'var(--bloom-text)',
+              fontFamily: "'Inter', sans-serif",
+            },
+          }}
+        />
       </body>
     </html>
   );

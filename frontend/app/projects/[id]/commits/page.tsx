@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import { GitCommit, Github, Calendar, Bot, Loader2 } from 'lucide-react';
-import { api } from '@/lib/api';
+import api from '@/lib/api';
 
 export default function CommitsPage() {
   const { id } = useParams();

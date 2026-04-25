@@ -1,21 +1,24 @@
 'use client';
 
-import { Bell, Search, LogOut } from 'lucide-react';
+import { Bell, Search, Plus } from 'lucide-react';
 import { useAuthStore } from '@/lib/store';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { api } from '@/lib/api';
+import api from '@/lib/api';
 import { toast } from 'sonner';
-import { clearTokens } from '@/lib/auth';
 
-export function Navbar() {
+interface NavbarProps {
+  pageTitle?: string;
+  onNewTask?: () => void;
+}
+
+export function Navbar({ pageTitle, onNewTask }: NavbarProps) {
   const router = useRouter();
   const user = useAuthStore((state) => state.user);
   const token = useAuthStore((state) => state.accessToken);
   const [unreadCounts, setUnreadCounts] = useState(0);
 
   useEffect(() => {
-    // Quick polling or initial fetch for notifications in real world
     const fetchNotifs = async () => {
       try {
         const res = await api.get('/api/notifications');
@@ -44,56 +47,65 @@ export function Navbar() {
     return () => ws.close();
   }, [user, token]);
 
-  const handleLogout = () => {
-    clearTokens();
-    useAuthStore.getState().logout();
-    document.cookie = 'access_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC;';
-    router.push('/login');
-  };
-
   return (
-    <header className="h-16 bg-black/20 backdrop-blur-md border-b border-white/10 flex items-center justify-between px-6 sticky top-0 z-10">
-      <div className="flex-1 max-w-md relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
-        <input 
-          type="text" 
-          placeholder="Search projects, tasks, or members (Ctrl+K)" 
-          className="w-full bg-black/40 border border-white/10 rounded-full pl-10 pr-4 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 transition-all"
+    <header
+      className="h-16 flex items-center justify-between px-6 shrink-0"
+      style={{
+        background: 'var(--bloom-bg)',
+        borderBottom: '1px solid var(--bloom-border)',
+      }}
+    >
+      {/* Page title */}
+      <h1 className="font-serif text-2xl font-bold" style={{ color: 'var(--bloom-text)' }}>
+        {pageTitle || 'Dashboard'}
+      </h1>
+
+      {/* Centre search */}
+      <div className="flex-1 max-w-sm mx-8 relative">
+        <Search
+          size={14}
+          className="absolute left-3 top-1/2 -translate-y-1/2"
+          style={{ color: 'var(--bloom-muted)' }}
         />
+        <input
+          type="text"
+          placeholder="Search projects, tasks, people..."
+          className="bloom-input w-full pl-9 pr-4 py-2 text-sm"
+          style={{ background: 'var(--bloom-surface)' }}
+        />
+        <span
+          className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-medium px-1.5 py-0.5 rounded-md"
+          style={{ background: 'var(--bloom-border)', color: 'var(--bloom-muted)' }}
+        >
+          ⌘K
+        </span>
       </div>
 
-      <div className="flex items-center space-x-6">
-        <button className="relative text-gray-400 hover:text-white transition-colors">
-          <Bell className="w-5 h-5" />
+      {/* Right actions */}
+      <div className="flex items-center gap-3">
+        <button
+          className="relative p-2 rounded-xl transition-colors hover:bg-black/5"
+          style={{ color: 'var(--bloom-muted)' }}
+        >
+          <Bell size={18} />
           {unreadCounts > 0 && (
-            <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-[10px] font-bold flex items-center justify-center rounded-full border-2 border-background">
+            <span
+              className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full text-[9px] font-bold flex items-center justify-center text-white"
+              style={{ background: 'var(--bloom-coral)' }}
+            >
               {unreadCounts}
             </span>
           )}
         </button>
 
         <button
-          data-testid="logout-btn"
-          onClick={handleLogout}
-          className="text-gray-400 hover:text-white transition-colors"
-          title="Logout"
+          data-testid="new-task-btn"
+          onClick={onNewTask}
+          className="bloom-btn-primary text-sm"
         >
-          <LogOut className="w-5 h-5" />
+          <Plus size={14} />
+          New task
         </button>
-
-        <div className="flex items-center space-x-3 border-l border-white/10 pl-6 cursor-pointer">
-          <div className="text-right hidden md:block">
-            <p className="text-sm font-medium text-white leading-none">{user?.name || 'User'}</p>
-            <p className="text-xs text-gray-400 mt-1">{user?.email || 'user@example.com'}</p>
-          </div>
-          {user?.avatar_url ? (
-            <img src={user.avatar_url} alt="avatar" className="w-9 h-9 rounded-full object-cover border border-white/20" />
-          ) : (
-            <div className="w-9 h-9 bg-gradient-to-tr from-indigo-500 to-purple-500 rounded-full flex items-center justify-center border border-white/20 shadow-inner">
-              <span className="text-white text-sm font-bold uppercase">{user?.name?.charAt(0) || 'U'}</span>
-            </div>
-          )}
-        </div>
       </div>
     </header>
   );

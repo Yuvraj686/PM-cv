@@ -10,7 +10,7 @@ interface AuthState {
   logout: () => void;
 }
 
-const AUTH_COOKIE_NAME = 'projecthub_access_token';
+const AUTH_COOKIE_NAME = 'access_token';
 
 const setAuthCookie = (token: string) => {
   if (typeof document === 'undefined') return;
@@ -23,24 +23,53 @@ const clearAuthCookie = () => {
   document.cookie = `${AUTH_COOKIE_NAME}=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; samesite=lax`;
 };
 
+/** Read tokens from localStorage directly (set by the login page). */
+const getStoredAccessToken = (): string | null => {
+  if (typeof window === 'undefined') return null;
+  return localStorage.getItem('access_token');
+};
+
+const getStoredRefreshToken = (): string | null => {
+  if (typeof window === 'undefined') return null;
+  return localStorage.getItem('refresh_token');
+};
+
 export const useAuthStore = create<AuthState>()(
   persist(
     (set) => ({
-      accessToken: null,
-      refreshToken: null,
+      // Self-hydrate from localStorage so the login page's direct writes are picked up
+      accessToken: getStoredAccessToken(),
+      refreshToken: getStoredRefreshToken(),
       user: null,
       setTokens: (accessToken, refreshToken) => {
+        // Keep both the Zustand state and the direct localStorage keys in sync
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('access_token', accessToken);
+          localStorage.setItem('refresh_token', refreshToken);
+        }
         setAuthCookie(accessToken);
         set({ accessToken, refreshToken });
       },
       setUser: (user) => set({ user }),
       logout: () => {
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem('access_token');
+          localStorage.removeItem('refresh_token');
+        }
         clearAuthCookie();
         set({ accessToken: null, refreshToken: null, user: null });
       },
     }),
     {
       name: 'auth-storage',
+      // Merge persisted state but also always pick up the direct localStorage keys
+      merge: (persistedState: any, currentState) => ({
+        ...currentState,
+        ...persistedState,
+        // Always prefer the direct localStorage key (written by login page)
+        accessToken: getStoredAccessToken() || persistedState?.accessToken || null,
+        refreshToken: getStoredRefreshToken() || persistedState?.refreshToken || null,
+      }),
     }
   )
 );

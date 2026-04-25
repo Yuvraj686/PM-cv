@@ -29,3 +29,12 @@ out/
 # Celery
 celerybeat-schedule*
 *.log
+
+# Project Specific
+*_results.txt
+scratch/
+backend/scratch/
+backend/data.db
+.pytest_cache/
+*.db
+
