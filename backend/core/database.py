@@ -2,15 +2,28 @@ from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sess
 from sqlalchemy.orm import DeclarativeBase
 from core.config import settings
 
-# Create async engine — Supabase uses SSL by default
+DATABASE_URL = settings.DATABASE_URL
+if DATABASE_URL.startswith("postgresql://"):
+    DATABASE_URL = DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://", 1)
+
+# Remove sslmode from URL if present (causes conflicts with connect_args)
+if "sslmode=" in DATABASE_URL:
+    import re
+    DATABASE_URL = re.sub(r"[?&]sslmode=\w+", "", DATABASE_URL)
+
+# Railway internal network: no SSL needed
+# If using Supabase or external DB: use ssl="require"
+IS_RAILWAY_INTERNAL = "railway.internal" in DATABASE_URL
+
 engine = create_async_engine(
-    settings.DATABASE_URL,
+    DATABASE_URL,
     echo=False,
     pool_size=10,
     max_overflow=20,
     pool_pre_ping=True,
-    connect_args={"ssl": "require"},  # Supabase requires SSL
+    connect_args={} if IS_RAILWAY_INTERNAL else {"ssl": "require"},
 )
+
 
 AsyncSessionLocal = async_sessionmaker(
     engine,
