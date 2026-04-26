@@ -3,6 +3,7 @@ services:
   - type: web
     name: projecthub-backend
     env: python
+    plan: free
     rootDir: backend
     buildCommand: "pip install -r requirements.txt && alembic upgrade head"
     startCommand: "uvicorn main:app --host 0.0.0.0 --port $PORT"
@@ -18,6 +19,7 @@ services:
   - type: web
     name: projecthub-frontend
     env: node
+    plan: free
     rootDir: frontend
     buildCommand: "npm install && npm run build"
     startCommand: "npm run start"
