@@ -1,14 +1,14 @@
 from datetime import datetime, date
 from uuid import UUID
-from pydantic import BaseModel, EmailStr, field_validator
+from pydantic import BaseModel, EmailStr, Field, field_validator
 
 
 # ─── Auth Schemas ──────────────────────────────────────────────────────────────
 
 class UserRegister(BaseModel):
-    name: str
+    name: str = Field(..., min_length=1, max_length=100)
     email: EmailStr
-    password: str
+    password: str = Field(..., min_length=8, max_length=72)
 
     @field_validator("password")
     @classmethod
@@ -74,15 +74,15 @@ class OnboardingSetup(BaseModel):
 # ─── Project Schemas ───────────────────────────────────────────────────────────
 
 class ProjectCreate(BaseModel):
-    name: str
-    description: str | None = None
+    name: str = Field(..., min_length=1, max_length=200)
+    description: str | None = Field(default=None, max_length=5000)
     repo_url: str | None = None
     deadline: str | None = None  # ISO date string YYYY-MM-DD
 
 
 class ProjectUpdate(BaseModel):
-    name: str | None = None
-    description: str | None = None
+    name: str | None = Field(default=None, min_length=1, max_length=200)
+    description: str | None = Field(default=None, max_length=5000)
     repo_url: str | None = None
     deadline: str | None = None
 
@@ -121,8 +121,8 @@ class MemberOut(BaseModel):
 
 class TaskCreate(BaseModel):
     project_id: str
-    title: str
-    description: str | None = None
+    title: str = Field(..., min_length=1, max_length=500)
+    description: str | None = Field(default=None, max_length=10000)
     status: str = "todo"
     priority: str = "medium"
     assignee_id: str | None = None
@@ -131,8 +131,8 @@ class TaskCreate(BaseModel):
 
 
 class TaskUpdate(BaseModel):
-    title: str | None = None
-    description: str | None = None
+    title: str | None = Field(default=None, min_length=1, max_length=500)
+    description: str | None = Field(default=None, max_length=10000)
     status: str | None = None
     priority: str | None = None
     assignee_id: str | None = None
@@ -205,8 +205,35 @@ class AIChatMessage(BaseModel):
 
 
 class AIChatRequest(BaseModel):
-    message: str
+    message: str = Field(..., min_length=1, max_length=10000)
     history: list[AIChatMessage] = []
+
+
+class AIGenerateTasksRequest(BaseModel):
+    project_id: str
+    project_goal: str = Field(..., min_length=1, max_length=5000)
+    context: str | None = Field(default=None, max_length=10000)
+
+
+class AITranscriptRequest(BaseModel):
+    transcript: str = Field(..., min_length=10, max_length=50000)
+    project_id: str
+
+
+class AIImproveTextRequest(BaseModel):
+    text: str = Field(..., min_length=1, max_length=10000)
+    context: str = Field(default="task_description")  # task_description | pr_summary
+
+    @field_validator("context")
+    @classmethod
+    def valid_context(cls, v: str) -> str:
+        if v not in ("task_description", "pr_summary"):
+            raise ValueError("context must be task_description or pr_summary")
+        return v
+
+
+class AIAcceptTasksRequest(BaseModel):
+    task_ids: list[str] = Field(..., min_length=1)
 
 
 # ─── Commit Schemas ────────────────────────────────────────────────────────────

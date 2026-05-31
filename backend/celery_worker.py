@@ -3,6 +3,7 @@ import logging
 from datetime import datetime, timedelta, timezone, date
 from celery import Celery
 from celery.schedules import crontab
+from kombu import Queue
 from core.config import settings
 
 logger = logging.getLogger(__name__)
@@ -19,6 +20,23 @@ celery_app.conf.update(
     result_serializer="json",
     timezone="UTC",
     enable_utc=True,
+    task_default_queue="high_priority",
+    task_queues=(
+        Queue("high_priority"),
+        Queue("low_priority"),
+    ),
+    task_routes={
+        # Notifications / real-time events -> high_priority
+        "services.notification.check_deadlines": {"queue": "high_priority"},
+        # Daily digest / emails -> low_priority
+        "services.notification.daily_digest": {"queue": "low_priority"},
+        # GitHub sync -> low_priority
+        "services.github.sync_all": {"queue": "low_priority"},
+        # AI tasks and generic patterns -> low_priority
+        "services.ai.*": {"queue": "low_priority"},
+        "services.github.*": {"queue": "low_priority"},
+        "services.email.*": {"queue": "low_priority"},
+    },
     beat_schedule={
         "check-deadlines-hourly": {
             "task": "services.notification.check_deadlines",
@@ -28,9 +46,9 @@ celery_app.conf.update(
             "task": "services.notification.daily_digest",
             "schedule": crontab(hour=9, minute=0),
         },
-        "sync-github-4hourly": {
+        "sync-github-15min": {
             "task": "services.github.sync_all",
-            "schedule": crontab(minute=0, hour="*/4"),
+            "schedule": crontab(minute="*/15"),  # every 15 minutes
         },
     },
 )
@@ -52,6 +70,10 @@ def send_daily_digest():
 def sync_all_github():
     """Sync issues for all projects with GitHub repos."""
     asyncio.run(_async_sync_all_github())
+
+
+# Register AI Celery tasks (import side-effect)
+import services.ai_tasks  # noqa: E402, F401
 
 
 async def _async_check_deadlines():
