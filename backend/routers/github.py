@@ -3,7 +3,7 @@ import hmac
 import json
 import logging
 from typing import Annotated
-from fastapi import APIRouter, Depends, HTTPException, Request, Header
+from fastapi import APIRouter, Depends, Request, Header
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from core.database import get_db, AsyncSessionLocal
@@ -13,11 +13,17 @@ from models.user import User
 from models.project import Project
 from models.commit import Commit
 from models.channel import Channel
-from models.channel_member import ChannelMember
 from models.message import Message
 from services.ai_service import summarize_commits
 from services.github_service import sync_repo_issues
+from services.activity_service import log_activity
 from websocket.manager import manager
+from utils.exceptions import (
+    ForbiddenError,
+    NotFoundError,
+    ValidationError,
+    ProjectHubException,
+)
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/github", tags=["github"])
@@ -37,13 +43,16 @@ async def github_webhook(
 
     # Verify HMAC signature
     if settings.GITHUB_WEBHOOK_SECRET:
-        sig = "sha256=" + hmac.new(
-            settings.GITHUB_WEBHOOK_SECRET.encode(),
-            body,
-            hashlib.sha256,
-        ).hexdigest()
+        sig = (
+            "sha256="
+            + hmac.new(
+                settings.GITHUB_WEBHOOK_SECRET.encode(),
+                body,
+                hashlib.sha256,
+            ).hexdigest()
+        )
         if not hmac.compare_digest(sig, x_hub_signature_256 or ""):
-            raise HTTPException(status_code=403, detail="Invalid webhook signature")
+            raise ForbiddenError(message="Invalid webhook signature")
 
     payload = json.loads(body)
     event = request.headers.get("x-github-event", "")
@@ -83,7 +92,8 @@ async def github_webhook(
             author_name=commit_list[0]["author"] if commit_list else None,
             commit_messages=[c["message"] for c in commit_list],
             file_changes=[
-                f for c in commit_list
+                f
+                for c in commit_list
                 for f in (c["modified"] + c["added"] + c["removed"])
             ],
             ai_summary=ai_summary,
@@ -108,6 +118,22 @@ async def github_webhook(
                 message_type="ai_summary",
             )
             db.add(bot_message)
+
+        await db.flush()
+
+        await log_activity(
+            db,
+            project_id=project_id,
+            actor_id=None,
+            action="github_push",
+            target_id=str(commit.id),
+            target_type="commit",
+            metadata={
+                "author": commit_list[0]["author"] if commit_list else "Unknown",
+                "commit_count": len(commit_list),
+                "summary": ai_summary[:200],
+            },
+        )
 
         await db.commit()
 
@@ -155,22 +181,26 @@ async def sync_github_issues(project_id: str, current_user: CurrentUser, db: DB)
     result = await db.execute(select(Project).where(Project.id == project_id))
     project = result.scalar_one_or_none()
     if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
-    
+        raise NotFoundError(message="Project not found")
+
     # Simple membership check
     from models.project_member import ProjectMember
+
     mem = await db.execute(
-        select(ProjectMember).where(ProjectMember.project_id == project_id, ProjectMember.user_id == current_user.id)
+        select(ProjectMember).where(
+            ProjectMember.project_id == project_id,
+            ProjectMember.user_id == current_user.id,
+        )
     )
     if not mem.scalar_one_or_none():
-        raise HTTPException(status_code=403, detail="Not a member of this project")
+        raise ForbiddenError(message="Not a member of this project")
 
     if not project.repo_url:
-        raise HTTPException(status_code=400, detail="Project has no GitHub repository URL")
+        raise ValidationError(message="Project has no GitHub repository URL")
 
     try:
         await sync_repo_issues(project_id, project.repo_url, db)
         return {"status": "success", "message": "Issues synced from GitHub"}
     except Exception as e:
         logger.error(f"Manual sync failed: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise ProjectHubException(status_code=500, code="SERVER_ERROR", message=str(e))

@@ -1,19 +1,25 @@
-import logging
-import resend
+import structlog
+import httpx
 from core.config import settings
 from models.notification import Notification
 
-logger = logging.getLogger(__name__)
-resend.api_key = settings.RESEND_API_KEY
+logger = structlog.get_logger()
 
 
-async def send_deadline_alert_email(task, user, project_name: str | None = None) -> None:
+async def send_deadline_alert_email(
+    task, user, project_name: str | None = None
+) -> None:
     """Send deadline alert email to task assignee."""
-    if not settings.RESEND_API_KEY:
-        logger.warning("RESEND_API_KEY not set — skipping email")
+    logger.info(
+        "send_deadline_alert_email_started", task_id=str(task.id), user_id=str(user.id)
+    )
+    if not settings.EMAIL_API_KEY:
+        logger.warning("EMAIL_API_KEY not set — skipping deadline alert email")
         return
 
-    project_line = f"<strong>Project:</strong> {project_name}<br>" if project_name else ""
+    project_line = (
+        f"<strong>Project:</strong> {project_name}<br>" if project_name else ""
+    )
     task_url = f"{settings.FRONTEND_URL}/projects/{task.project_id}/tasks"
 
     html = f"""
@@ -30,7 +36,7 @@ async def send_deadline_alert_email(task, user, project_name: str | None = None)
           {project_line}
           <strong>Due Date:</strong> {task.due_date}<br>
           <strong>Priority:</strong> {task.priority.upper()}<br>
-          <strong>Status:</strong> {task.status.replace('_', ' ').title()}
+          <strong>Status:</strong> {task.status.replace("_", " ").title()}
         </p>
       </div>
       <p style="color: #94a3b8; font-size: 14px;">Please update the task status or reach out to your project lead.</p>
@@ -42,31 +48,44 @@ async def send_deadline_alert_email(task, user, project_name: str | None = None)
     """
 
     try:
-        resend.Emails.send({
-            "from": settings.FROM_EMAIL,
-            "to": user.email,
-            "subject": f"Deadline Alert: {task.title}",
-            "html": html,
-        })
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                settings.EMAIL_API_URL,
+                headers={"Authorization": f"Bearer {settings.EMAIL_API_KEY}"},
+                json={
+                    "from": settings.FROM_EMAIL,
+                    "to": user.email,
+                    "subject": f"Deadline Alert: {task.title}",
+                    "html": html,
+                },
+            )
+            response.raise_for_status()
         logger.info(f"Deadline alert email sent to {user.email}")
     except Exception as e:
-        logger.error(f"Resend error: {e}")
+        logger.error(f"Failed to send deadline alert email: {e}")
 
 
 async def send_daily_digest_email(admin, tasks: list, projects: dict) -> None:
     """Send daily digest of all tasks due tomorrow to project admins."""
-    if not settings.RESEND_API_KEY:
+    logger.info(
+        "send_daily_digest_email_started",
+        admin_id=str(admin.id),
+        tasks_count=len(tasks),
+    )
+    if not settings.EMAIL_API_KEY:
         return
 
-    task_rows = "".join([
-        f"""<tr>
+    task_rows = "".join(
+        [
+            f"""<tr>
           <td style="padding: 8px 12px; border-bottom: 1px solid #334155; color: #fff;">{t.title}</td>
-          <td style="padding: 8px 12px; border-bottom: 1px solid #334155; color: #94a3b8;">{projects.get(str(t.project_id), 'Unknown')}</td>
+          <td style="padding: 8px 12px; border-bottom: 1px solid #334155; color: #94a3b8;">{projects.get(str(t.project_id), "Unknown")}</td>
           <td style="padding: 8px 12px; border-bottom: 1px solid #334155; color: #F59E0B;">{t.priority.upper()}</td>
-          <td style="padding: 8px 12px; border-bottom: 1px solid #334155; color: #94a3b8;">{t.status.replace('_',' ').title()}</td>
+          <td style="padding: 8px 12px; border-bottom: 1px solid #334155; color: #94a3b8;">{t.status.replace("_", " ").title()}</td>
         </tr>"""
-        for t in tasks
-    ])
+            for t in tasks
+        ]
+    )
 
     html = f"""
     <div style="font-family: Inter, sans-serif; max-width: 700px; margin: 0 auto; background: #0F1117; color: #fff; padding: 32px; border-radius: 12px;">
@@ -93,18 +112,29 @@ async def send_daily_digest_email(admin, tasks: list, projects: dict) -> None:
     """
 
     try:
-        resend.Emails.send({
-            "from": settings.FROM_EMAIL,
-            "to": admin.email,
-            "subject": f"📋 Daily Digest: {len(tasks)} task(s) due tomorrow",
-            "html": html,
-        })
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                settings.EMAIL_API_URL,
+                headers={"Authorization": f"Bearer {settings.EMAIL_API_KEY}"},
+                json={
+                    "from": settings.FROM_EMAIL,
+                    "to": admin.email,
+                    "subject": f"📋 Daily Digest: {len(tasks)} task(s) due tomorrow",
+                    "html": html,
+                },
+            )
+            response.raise_for_status()
     except Exception as e:
         logger.error(f"Daily digest email failed: {e}")
 
 
-async def create_notification_record(db, user_id: str, notif_type: str, content: str) -> Notification:
+async def create_notification_record(
+    db, user_id: str, notif_type: str, content: str
+) -> Notification:
     """Create and persist an in-app notification."""
+    logger.info(
+        "create_notification_record_started", user_id=user_id, notif_type=notif_type
+    )
     notif = Notification(user_id=user_id, type=notif_type, content=content)
     db.add(notif)
     await db.flush()

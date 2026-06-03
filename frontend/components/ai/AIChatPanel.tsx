@@ -10,7 +10,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 export function AIChatPanel() {
   const { id } = useParams();
   const projectId = id as string;
-  const user = useAuthStore((s) => s.user);
   
   const [messages, setMessages] = useState<any[]>([]);
   const [input, setInput] = useState('');
@@ -128,7 +127,7 @@ export function AIChatPanel() {
           <div className="h-full flex flex-col items-center justify-center text-center max-w-md mx-auto">
             <Bot size={56} className="text-indigo-500/50 mb-4" />
             <h3 className="text-xl font-bold mb-2">How can I help you today?</h3>
-            <p className="text-muted-foreground text-sm">I have full access to this project's tasks, deadlines, members, and recent GitHub commits. Try asking me for a status update.</p>
+            <p className="text-muted-foreground text-sm">I have full access to this project&apos;s tasks, deadlines, members, and recent GitHub commits. Try asking me for a status update.</p>
             
             <div className="mt-8 space-y-2 w-full">
               {['What tasks are at risk of missing their deadline?', 'Summarize the recent engineering progress.', 'Who has the most tasks assigned?'].map((q, i) => (

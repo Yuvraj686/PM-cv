@@ -5,6 +5,7 @@ FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000")
 SCREENSHOTS_DIR = "/tmp/screenshots"
 
 
+@pytest.mark.e2e
 class TestPhoneAuth:
     """Test phone OTP authentication UI and flows."""
 

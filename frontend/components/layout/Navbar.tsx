@@ -1,6 +1,6 @@
 'use client';
 
-import { Bell, Search, Plus, X, Inbox, Clock, CheckCircle } from 'lucide-react';
+import { Bell, Search, Plus, X, Inbox, Clock, Sparkles } from 'lucide-react';
 import { useAuthStore } from '@/lib/store';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState, useRef } from 'react';
@@ -33,8 +33,18 @@ export function Navbar({ pageTitle, onNewTask }: NavbarProps) {
   // New Task State
   const [isNewTaskOpen, setIsNewTaskOpen] = useState(false);
   const [projects, setProjects] = useState<any[]>([]);
-  const [newTaskForm, setNewTaskForm] = useState({ project_id: '', title: '', description: '', priority: 'medium', status: 'todo' });
+  const [newTaskForm, setNewTaskForm] = useState({
+    project_id: '',
+    title: '',
+    description: '',
+    priority: 'medium',
+    story_points: '',
+    status: 'todo',
+  });
   const [isCreatingTask, setIsCreatingTask] = useState(false);
+
+  // AI usage
+  const [aiUsage, setAiUsage] = useState<{ remaining: number; limit: number } | null>(null);
 
   useEffect(() => {
     const fetchNotifs = async () => {
@@ -43,9 +53,21 @@ export function Navbar({ pageTitle, onNewTask }: NavbarProps) {
         setNotifications(res.data);
         const unread = res.data.filter((n: any) => !n.read).length;
         setUnreadCounts(unread);
-      } catch (err) {}
+      } catch {}
     };
     if (user) fetchNotifs();
+  }, [user]);
+
+  useEffect(() => {
+    const fetchAiUsage = async () => {
+      try {
+        const res = await api.get('/api/ai/usage');
+        setAiUsage(res.data);
+      } catch {
+        /* ignore */
+      }
+    };
+    if (user) fetchAiUsage();
   }, [user]);
 
   useEffect(() => {
@@ -135,6 +157,11 @@ export function Navbar({ pageTitle, onNewTask }: NavbarProps) {
   const handleCreateTask = async () => {
     if (!newTaskForm.project_id) { toast.error('Please select a project'); return; }
     if (!newTaskForm.title.trim()) { toast.error('Task title is required'); return; }
+    const parsedStoryPoints = newTaskForm.story_points === '' ? null : Number(newTaskForm.story_points);
+    if (parsedStoryPoints !== null && (Number.isNaN(parsedStoryPoints) || parsedStoryPoints < 0 || parsedStoryPoints > 100)) {
+      toast.error('Story points must be between 0 and 100');
+      return;
+    }
     setIsCreatingTask(true);
     try {
       await api.post('/api/tasks', {
@@ -142,11 +169,12 @@ export function Navbar({ pageTitle, onNewTask }: NavbarProps) {
         title: newTaskForm.title,
         description: newTaskForm.description || null,
         priority: newTaskForm.priority,
+        story_points: parsedStoryPoints,
         status: newTaskForm.status
       });
       toast.success('Task created successfully');
       setIsNewTaskOpen(false);
-      setNewTaskForm({ ...newTaskForm, title: '', description: '' });
+      setNewTaskForm({ ...newTaskForm, title: '', description: '', story_points: '' });
       if (onNewTask) onNewTask();
     } catch (err: any) {
       toast.error(err.response?.data?.detail || 'Failed to create task');
@@ -161,7 +189,7 @@ export function Navbar({ pageTitle, onNewTask }: NavbarProps) {
       await api.patch('/api/notifications/read-all');
       setUnreadCounts(0);
       setNotifications(notifications.map(n => ({ ...n, read: true })));
-    } catch (err) {}
+    } catch {}
   };
 
   return (
@@ -204,6 +232,16 @@ export function Navbar({ pageTitle, onNewTask }: NavbarProps) {
 
         {/* Right actions */}
         <div className="flex items-center gap-3 relative">
+          {aiUsage !== null && (
+            <div
+              className="flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-lg"
+              style={{ background: 'var(--bloom-purple-bg)', color: 'var(--bloom-purple)' }}
+              title="Daily AI requests remaining (resets midnight UTC)"
+            >
+              <Sparkles size={12} />
+              {aiUsage.remaining}/{aiUsage.limit} AI
+            </div>
+          )}
           <div ref={notifRef} className="relative">
             <button
               className="relative p-2 rounded-xl transition-colors hover:bg-black/5"
@@ -240,7 +278,7 @@ export function Navbar({ pageTitle, onNewTask }: NavbarProps) {
                       <p className="text-sm">No new notifications</p>
                     </div>
                   ) : (
-                    <div className="flex flex-col divide-y" style={{ divideColor: 'var(--bloom-border)' }}>
+                    <div className="flex flex-col divide-y divide-[var(--bloom-border)]">
                       {notifications.map((n) => (
                         <div key={n.id} className={`p-3 text-sm transition-colors hover:bg-black/5 ${!n.read ? 'bg-[var(--bloom-coral-bg)]/50' : ''}`}>
                           <p style={{ color: 'var(--bloom-text)' }}>{n.content}</p>
@@ -291,7 +329,7 @@ export function Navbar({ pageTitle, onNewTask }: NavbarProps) {
               {isSearching ? (
                 <div className="p-4 text-center text-sm" style={{ color: 'var(--bloom-muted)' }}>Searching...</div>
               ) : searchQuery && searchResults.projects.length === 0 && searchResults.tasks.length === 0 ? (
-                <div className="p-8 text-center text-sm" style={{ color: 'var(--bloom-muted)' }}>No results found for "{searchQuery}"</div>
+                <div className="p-8 text-center text-sm" style={{ color: 'var(--bloom-muted)' }}>No results found for &quot;{searchQuery}&quot;</div>
               ) : !searchQuery ? (
                 <div className="p-8 text-center text-sm flex flex-col items-center gap-2" style={{ color: 'var(--bloom-muted)' }}>
                   <Search size={24} className="opacity-50" />
@@ -390,6 +428,18 @@ export function Navbar({ pageTitle, onNewTask }: NavbarProps) {
                     </select>
                   </div>
                   <div>
+                    <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--bloom-muted)' }}>Story points</label>
+                    <input
+                      type="number"
+                      min={0}
+                      max={100}
+                      className="bloom-input w-full text-sm"
+                      placeholder="Optional"
+                      value={newTaskForm.story_points}
+                      onChange={(e) => setNewTaskForm({ ...newTaskForm, story_points: e.target.value })}
+                    />
+                  </div>
+                  <div className="col-span-2">
                     <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--bloom-muted)' }}>Status</label>
                     <select className="bloom-input w-full text-sm" value={newTaskForm.status} onChange={(e) => setNewTaskForm({ ...newTaskForm, status: e.target.value })}>
                       <option value="todo">To Do</option>
@@ -413,4 +463,3 @@ export function Navbar({ pageTitle, onNewTask }: NavbarProps) {
     </>
   );
 }
-

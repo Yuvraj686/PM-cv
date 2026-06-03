@@ -1,11 +1,12 @@
 from typing import Annotated
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from core.database import get_db
 from core.dependencies import get_current_user
 from models.user import User
 from schemas.schemas import UserOut, UserUpdate, OnboardingSetup
+from utils.exceptions import ConflictError
 
 router = APIRouter(prefix="/api/users", tags=["users"])
 
@@ -28,13 +29,15 @@ async def update_profile(payload: UserUpdate, current_user: CurrentUser, db: DB)
 
 
 @router.post("/me/onboarding", response_model=UserOut)
-async def complete_onboarding(payload: OnboardingSetup, current_user: CurrentUser, db: DB):
+async def complete_onboarding(
+    payload: OnboardingSetup, current_user: CurrentUser, db: DB
+):
     """Complete the onboarding flow — set username and optional GitHub handle."""
     # Check username uniqueness
     result = await db.execute(select(User).where(User.username == payload.username))
     existing = result.scalar_one_or_none()
     if existing and existing.id != current_user.id:
-        raise HTTPException(status_code=409, detail="Username already taken")
+        raise ConflictError(message="Username already taken")
 
     current_user.username = payload.username
     if payload.github_username:
@@ -49,8 +52,13 @@ async def complete_onboarding(payload: OnboardingSetup, current_user: CurrentUse
 async def check_username(username: str, current_user: CurrentUser, db: DB):
     """Returns {available: bool} for real-time username availability check."""
     import re
+
     username = username.strip().lower()
-    if not re.match(r'^[a-z0-9_\-]+$', username) or len(username) < 3 or len(username) > 30:
+    if (
+        not re.match(r"^[a-z0-9_\-]+$", username)
+        or len(username) < 3
+        or len(username) > 30
+    ):
         return {"available": False, "reason": "invalid_format"}
     result = await db.execute(select(User).where(User.username == username))
     existing = result.scalar_one_or_none()
@@ -65,9 +73,14 @@ async def search_users(q: str, current_user: CurrentUser, db: DB):
     result = await db.execute(
         select(User)
         .where(
-            (User.email.ilike(f"%{q}%")) | (User.name.ilike(f"%{q}%")) | (User.username.ilike(f"%{q}%"))
+            (User.email.ilike(f"%{q}%"))
+            | (User.name.ilike(f"%{q}%"))
+            | (User.username.ilike(f"%{q}%"))
         )
         .limit(10)
     )
     users = result.scalars().all()
-    return [{"id": str(u.id), "name": u.name, "email": u.email, "avatar_url": u.avatar_url} for u in users]
+    return [
+        {"id": str(u.id), "name": u.name, "email": u.email, "avatar_url": u.avatar_url}
+        for u in users
+    ]

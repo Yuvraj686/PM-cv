@@ -27,13 +27,17 @@ async def get_current_user(
 
     user_id = payload.get("sub")
     if not user_id:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token payload")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token payload"
+        )
 
     result = await db.execute(select(User).where(User.id == user_id))
     user = result.scalar_one_or_none()
 
     if not user:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found"
+        )
 
     return user
 
@@ -44,6 +48,7 @@ def require_role(*allowed_roles: str):
     Usage: Depends(require_role("admin", "project_lead"))
     Note: project_id must be a path param named 'project_id'.
     """
+
     async def role_checker(
         project_id: str,
         current_user=Depends(get_current_user),

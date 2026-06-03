@@ -3,10 +3,14 @@ from functools import lru_cache
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
+    model_config = SettingsConfigDict(
+        env_file=".env", env_file_encoding="utf-8", extra="ignore"
+    )
 
     # Database — Supabase PostgreSQL
-    DATABASE_URL: str = "postgresql+asyncpg://postgres:password@db.xxxx.supabase.co:5432/postgres"
+    DATABASE_URL: str = (
+        "postgresql+asyncpg://postgres:password@db.xxxx.supabase.co:5432/postgres"
+    )
 
     # Redis
     REDIS_URL: str = "redis://localhost:6379/0"
@@ -20,17 +24,25 @@ class Settings(BaseSettings):
     # Anthropic
     ANTHROPIC_API_KEY: str = ""
 
+    # OpenAI (AI task generator, risk analysis, writing assist)
+    OPENAI_API_KEY: str = ""
+    AI_DAILY_LIMIT: int = 10
+
     # GitHub
     GITHUB_WEBHOOK_SECRET: str = ""
     GITHUB_TOKEN: str = ""
 
-    # Resend (email)
-    RESEND_API_KEY: str = ""
+    # Email
+    EMAIL_API_KEY: str = ""
+    EMAIL_API_URL: str = "https://api.resend.com/emails"
     FROM_EMAIL: str = "noreply@projecthub.app"
 
     # App
     FRONTEND_URL: str = "http://localhost:3000"
     APP_NAME: str = "ProjectHub"
+    ENV: str = "development"
+    ALLOWED_ORIGINS: str = ""  # Comma-separated list for production CORS
+    SENTRY_DSN: str = ""
 
     # Google OAuth (optional)
     GOOGLE_CLIENT_ID: str = ""
@@ -42,10 +54,13 @@ class Settings(BaseSettings):
     GITHUB_CLIENT_SECRET: str = ""
     GITHUB_REDIRECT_URI: str = "http://localhost:8000/api/auth/github/callback"
 
-    # Twilio (SMS/Phone OTP)
-    TWILIO_ACCOUNT_SID: str = ""
-    TWILIO_AUTH_TOKEN: str = ""
-    TWILIO_PHONE_NUMBER: str = ""
+    # Slack OAuth + notifications
+    SLACK_CLIENT_ID: str = ""
+    SLACK_CLIENT_SECRET: str = ""
+    SLACK_REDIRECT_URI: str = "http://localhost:8000/api/integrations/slack/callback"
+
+    # Encryption (Fernet-compatible key recommended)
+    ENCRYPTION_KEY: str = ""
 
 
 @lru_cache()

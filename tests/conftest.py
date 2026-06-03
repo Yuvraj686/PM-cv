@@ -1,134 +1,199 @@
+"""
+Shared test fixtures for ProjectHub backend tests.
+
+Provides an in-memory SQLite database, FastAPI TestClient, pre-built
+auth headers, and sample project/task objects.  Each test runs inside
+a DB transaction that is rolled back automatically.
+"""
+import sys
+import asyncio
+import uuid
 import pytest
+import pytest_asyncio
+from typing import AsyncGenerator
+
+# Detect E2E mode where asyncio is disabled to prevent event loop conflicts
+is_e2e = (
+    any(arg == "e2e" for arg in sys.argv)
+    or any("no:asyncio" in arg for arg in sys.argv)
+    or any("test_auth_" in arg for arg in sys.argv)
+)
+
+
+from sqlalchemy.ext.asyncio import (
+    AsyncSession,
+    create_async_engine,
+    async_sessionmaker,
+)
+from httpx import AsyncClient, ASGITransport
+
+# ── Bootstrap: override settings BEFORE any app code is imported ────────────
 import os
-import requests
-from pathlib import Path
-from playwright.sync_api import sync_playwright, Browser, Page
-from datetime import datetime, timedelta
-import time
+os.environ.setdefault("DATABASE_URL", "sqlite+aiosqlite:///:memory:")
+os.environ.setdefault("REDIS_URL", "redis://localhost:6379/0")
+os.environ.setdefault("SECRET_KEY", "test-secret-key-for-ci")
+os.environ.setdefault("ENV", "development")
 
-# Create temp directories for screenshots and emails
-SCREENSHOTS_DIR = "/tmp/screenshots"
-EMAILS_DIR = "/tmp/emails"
-os.makedirs(SCREENSHOTS_DIR, exist_ok=True)
-os.makedirs(EMAILS_DIR, exist_ok=True)
+from core.database import Base, get_db          # noqa: E402
+from core.security import create_access_token, create_refresh_token  # noqa: E402
+from main import app                            # noqa: E402
+from models.user import User                    # noqa: E402
+from models.project import Project              # noqa: E402
+from models.project_member import ProjectMember # noqa: E402
+from models.task import Task                    # noqa: E402
 
-API_URL = os.getenv("NEXT_PUBLIC_API_URL", "http://localhost:8000")
-FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000")
+# ── In-memory SQLite engine (shared across the test session) ────────────────
+TEST_DB_URL = "sqlite+aiosqlite:///:memory:"
+engine = create_async_engine(TEST_DB_URL, echo=False)
+TestSessionLocal = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
+if is_e2e:
+    # ── Mock sync fixtures for E2E mode (avoids asyncio event loop conflicts) ──
+    @pytest.fixture(scope="session", autouse=True)
+    def setup_database():
+        yield
 
-@pytest.fixture(scope="session")
-def browser():
-    """Create a browser instance for the entire test session."""
-    with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True)
-        yield browser
-        browser.close()
+    @pytest.fixture
+    def db_session():
+        yield
 
+    @pytest.fixture(autouse=True)
+    def override_db():
+        yield
 
-@pytest.fixture
-def page(browser):
-    """Create a new page for each test."""
-    page = browser.new_page()
-    yield page
-    page.close()
+    @pytest.fixture
+    def test_client():
+        yield
 
+    @pytest.fixture
+    def test_user():
+        yield
 
-@pytest.fixture
-def api_client():
-    """Create an API client for direct backend requests."""
-    class APIClient:
-        def __init__(self, base_url=API_URL):
-            self.base_url = base_url
-            self.session = requests.Session()
-        
-        def get(self, endpoint, **kwargs):
-            return self.session.get(f"{self.base_url}{endpoint}", **kwargs)
-        
-        def post(self, endpoint, **kwargs):
-            return self.session.post(f"{self.base_url}{endpoint}", **kwargs)
-        
-        def put(self, endpoint, **kwargs):
-            return self.session.put(f"{self.base_url}{endpoint}", **kwargs)
-        
-        def delete(self, endpoint, **kwargs):
-            return self.session.delete(f"{self.base_url}{endpoint}", **kwargs)
-    
-    return APIClient()
+    @pytest.fixture
+    def auth_headers():
+        yield {}
 
+    @pytest.fixture
+    def auth_refresh_token():
+        yield ""
 
-@pytest.fixture
-def get_user_by_email():
-    """Get a user from database via API (admin endpoint or similar)."""
-    def _get_user(email: str):
-        try:
-            # This would require an admin endpoint to fetch user data
-            # For now, we'll return None - the tests will verify via API responses instead
-            return None
-        except Exception as e:
-            print(f"Error getting user: {e}")
-            return None
-    
-    return _get_user
+    @pytest.fixture
+    def test_project():
+        yield
+
+    @pytest.fixture
+    def test_task():
+        yield
+
+else:
+    # ── Real async fixtures for Integration/Unit tests ────────────────────────
+    # ── Create all tables once per session ──────────────────────────────────────
+    @pytest_asyncio.fixture(scope="session", autouse=True)
+    async def setup_database():
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+        yield
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.drop_all)
 
 
-@pytest.fixture
-def set_token_expired():
-    """Set a token expiration to the past (requires admin access)."""
-    def _set_expired(user_id: int, token_type: str, value=None):
-        try:
-            # This would require an admin endpoint
-            # For now, this is a placeholder
-            pass
-        except Exception as e:
-            print(f"Error setting token expired: {e}")
-    
-    return _set_expired
+    # ── Per-test DB session with fresh in-memory database ───────────────────────
+    @pytest_asyncio.fixture
+    async def db_session() -> AsyncGenerator[AsyncSession, None]:
+        test_engine = create_async_engine("sqlite+aiosqlite:///:memory:", echo=False)
+        async with test_engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+            
+        session_factory = async_sessionmaker(test_engine, class_=AsyncSession, expire_on_commit=False)
+        async with session_factory() as session:
+            yield session
+            
+        await test_engine.dispose()
 
 
-@pytest.fixture
-def get_token_from_db():
-    """Get a token from database via API."""
-    def _get_token(user_email: str, token_type: str):
-        try:
-            # This would require an admin endpoint to fetch token data
-            # For now, return None - tests will handle differently
-            return None
-        except Exception as e:
-            print(f"Error getting token from DB: {e}")
-            return None
-    
-    return _get_token
+    # ── Override FastAPI's get_db dependency ─────────────────────────────────────
+    @pytest_asyncio.fixture(autouse=True)
+    async def override_db(db_session: AsyncSession):
+        async def _get_test_db():
+            yield db_session
+
+        app.dependency_overrides[get_db] = _get_test_db
+        yield
+        app.dependency_overrides.pop(get_db, None)
 
 
-@pytest.fixture
-def clean_user():
-    """Delete a user from database via API (requires admin access)."""
-    def _delete(email: str):
-        try:
-            # This would require an admin endpoint
-            # For now, this is a placeholder
-            pass
-        except Exception as e:
-            print(f"Error cleaning user: {e}")
-    
-    return _delete
+    # ── Async HTTP client against the FastAPI app ───────────────────────────────
+    @pytest_asyncio.fixture
+    async def test_client() -> AsyncGenerator[AsyncClient, None]:
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://testserver") as client:
+            yield client
 
 
-@pytest.fixture
-def wait_for_backend():
-    """Wait for backend to be ready."""
-    def _wait(timeout=30):
-        start = time.time()
-        while time.time() - start < timeout:
-            try:
-                response = requests.get(f"{API_URL}/health", timeout=2)
-                if response.status_code == 200:
-                    return True
-            except:
-                pass
-            time.sleep(1)
-        return False
-    
-    return _wait
+    # ── Test user + JWT auth headers ────────────────────────────────────────────
+    @pytest_asyncio.fixture
+    async def test_user(db_session: AsyncSession) -> User:
+        from core.security import hash_password
+
+        user = User(
+            id=uuid.uuid4(),
+            name="Test User",
+            email="testuser@example.com",
+            hashed_password=hash_password("TestPass123"),
+            is_verified=True,
+        )
+        db_session.add(user)
+        await db_session.flush()
+        return user
 
 
+    @pytest_asyncio.fixture
+    async def auth_headers(test_user: User) -> dict[str, str]:
+        token = create_access_token({"sub": str(test_user.id), "email": test_user.email})
+        return {"Authorization": f"Bearer {token}"}
+
+
+    @pytest_asyncio.fixture
+    async def auth_refresh_token(test_user: User) -> str:
+        return create_refresh_token({"sub": str(test_user.id), "email": test_user.email})
+
+
+    # ── Test project ────────────────────────────────────────────────────────────
+    @pytest_asyncio.fixture
+    async def test_project(db_session: AsyncSession, test_user: User) -> Project:
+        project = Project(
+            id=uuid.uuid4(),
+            name="Test Project",
+            description="A project for testing",
+            owner_id=test_user.id,
+        )
+        db_session.add(project)
+        await db_session.flush()
+
+        # Add user as admin member
+        member = ProjectMember(
+            project_id=project.id,
+            user_id=test_user.id,
+            role="admin",
+        )
+        db_session.add(member)
+        await db_session.flush()
+        return project
+
+
+    # ── Test task ───────────────────────────────────────────────────────────────
+    @pytest_asyncio.fixture
+    async def test_task(db_session: AsyncSession, test_project: Project, test_user: User) -> Task:
+        task = Task(
+            id=uuid.uuid4(),
+            project_id=test_project.id,
+            title="Test Task",
+            description="A task for testing",
+            status="todo",
+            priority="medium",
+            assignee_id=test_user.id,
+            position=0,
+        )
+        db_session.add(task)
+        await db_session.flush()
+        return task

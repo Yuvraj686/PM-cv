@@ -1,57 +1,102 @@
 import asyncio
 import logging
 from datetime import datetime, timedelta, timezone, date
-from celery import Celery
-from celery.schedules import crontab
-from core.config import settings
+from core.celery_app import celery_app
 
 logger = logging.getLogger(__name__)
 
-celery_app = Celery(
-    "projecthub",
-    broker=settings.REDIS_URL,
-    backend=settings.REDIS_URL,
-)
 
-celery_app.conf.update(
-    task_serializer="json",
-    accept_content=["json"],
-    result_serializer="json",
-    timezone="UTC",
-    enable_utc=True,
-    beat_schedule={
-        "check-deadlines-hourly": {
-            "task": "services.notification.check_deadlines",
-            "schedule": crontab(minute=0),  # every hour
-        },
-        "daily-digest-9am": {
-            "task": "services.notification.daily_digest",
-            "schedule": crontab(hour=9, minute=0),
-        },
-        "sync-github-4hourly": {
-            "task": "services.github.sync_all",
-            "schedule": crontab(minute=0, hour="*/4"),
-        },
-    },
-)
+async def _run_and_cleanup(coro):
+    try:
+        return await coro
+    finally:
+        try:
+            from core.database import engine
+
+            await engine.dispose()
+        except Exception:
+            pass
 
 
 @celery_app.task(name="services.notification.check_deadlines")
 def check_deadlines():
     """Check tasks due within 48 hours and send alerts."""
-    asyncio.run(_async_check_deadlines())
+    asyncio.run(_run_and_cleanup(_async_check_deadlines()))
 
 
 @celery_app.task(name="services.notification.daily_digest")
 def send_daily_digest():
     """Send daily digest email to project admins."""
-    asyncio.run(_async_daily_digest())
+    asyncio.run(_run_and_cleanup(_async_daily_digest()))
 
 
 @celery_app.task(name="services.github.sync_all")
 def sync_all_github():
     """Sync issues for all projects with GitHub repos."""
-    asyncio.run(_async_sync_all_github())
+    asyncio.run(_run_and_cleanup(_async_sync_all_github()))
+
+
+@celery_app.task(name="services.integrations.slack_notify")
+def slack_notify(
+    project_id: str,
+    event: str,
+    message: str,
+    assignee_user_id: str | None = None,
+    mentioned_usernames: list[str] | None = None,
+):
+    """Send a Slack notification for a project integration event."""
+    asyncio.run(
+        _run_and_cleanup(
+            _async_slack_notify(
+                project_id=project_id,
+                event=event,
+                message=message,
+                assignee_user_id=assignee_user_id,
+                mentioned_usernames=mentioned_usernames or [],
+            )
+        )
+    )
+
+
+@celery_app.task(
+    name="services.webhooks.deliver", bind=True, max_retries=3, default_retry_delay=10
+)
+def deliver_webhook(
+    self,
+    webhook_id: str,
+    project_id: str,
+    event: str,
+    payload: dict,
+    attempt: int = 1,
+):
+    """Deliver a webhook payload with retries and delivery attempt logging."""
+    success, error = asyncio.run(
+        _run_and_cleanup(
+            _async_deliver_webhook(
+                webhook_id=webhook_id,
+                project_id=project_id,
+                event=event,
+                payload=payload,
+                attempt=attempt,
+            )
+        )
+    )
+    if not success and attempt < 3:
+        raise self.retry(
+            exc=Exception(error or "webhook delivery failed"),
+            countdown=10 * attempt,
+            kwargs={
+                "webhook_id": webhook_id,
+                "project_id": project_id,
+                "event": event,
+                "payload": payload,
+                "attempt": attempt + 1,
+            },
+        )
+
+
+# Register AI Celery tasks (import side-effect)
+import services.ai_tasks  # noqa: E402, F401
 
 
 async def _async_check_deadlines():
@@ -60,7 +105,11 @@ async def _async_check_deadlines():
     from models.task import Task
     from models.user import User
     from models.project import Project
-    from services.notification import send_deadline_alert_email, create_notification_record
+    from services.notification import (
+        send_deadline_alert_email,
+        create_notification_record,
+    )
+    from services.slack import notify_project_channel
     from websocket.manager import manager
 
     today = datetime.now(timezone.utc).date()
@@ -68,14 +117,13 @@ async def _async_check_deadlines():
 
     async with AsyncSessionLocal() as db:
         result = await db.execute(
-            select(Task)
-            .where(
+            select(Task).where(
                 and_(
-                    Task.due_date != None,
+                    Task.due_date is not None,
                     Task.due_date <= cutoff,
                     Task.status != "done",
-                    Task.alert_sent == False,
-                    Task.assignee_id != None,
+                    not Task.alert_sent,
+                    Task.assignee_id is not None,
                 )
             )
         )
@@ -83,13 +131,17 @@ async def _async_check_deadlines():
 
         for task in tasks:
             # Fetch assignee
-            user_result = await db.execute(select(User).where(User.id == task.assignee_id))
+            user_result = await db.execute(
+                select(User).where(User.id == task.assignee_id)
+            )
             user = user_result.scalar_one_or_none()
             if not user:
                 continue
 
             project_name: str | None = None
-            proj_res = await db.execute(select(Project.name).where(Project.id == task.project_id))
+            proj_res = await db.execute(
+                select(Project.name).where(Project.id == task.project_id)
+            )
             project_name = proj_res.scalar_one_or_none()
 
             # Send email
@@ -103,22 +155,41 @@ async def _async_check_deadlines():
                 db=db,
                 user_id=str(user.id),
                 notif_type="deadline_alert",
-                content=f'Deadline approaching: {task.title}',
+                content=f"Deadline approaching: {task.title}",
             )
 
             # Push WebSocket notification
-            await manager.send_to_user(str(user.id), {
-                "type": "notification",
-                "notification": {
-                    "id": str(notif.id),
-                    "type": notif.type,
-                    "content": notif.content,
-                    "created_at": notif.created_at.isoformat(),
+            await manager.send_to_user(
+                str(user.id),
+                {
+                    "type": "notification",
+                    "notification": {
+                        "id": str(notif.id),
+                        "type": notif.type,
+                        "content": notif.content,
+                        "created_at": notif.created_at.isoformat(),
+                    },
                 },
-            })
+            )
 
             # Mark alert sent
             task.alert_sent = True
+
+            if task.due_date and task.due_date < today:
+                try:
+                    await notify_project_channel(
+                        db,
+                        project_id=str(task.project_id),
+                        event="task_overdue",
+                        message=f"Task overdue: {task.title}",
+                        assignee_user_id=str(task.assignee_id)
+                        if task.assignee_id
+                        else None,
+                    )
+                except Exception as e:
+                    logger.error(
+                        f"Failed to send Slack overdue notification for task {task.id}: {e}"
+                    )
 
         await db.commit()
         logger.info(f"Deadline check: sent alerts for {len(tasks)} tasks")
@@ -132,7 +203,6 @@ async def _async_daily_digest():
     from models.user import User
     from models.project import Project
     from services.notification import send_daily_digest_email
-    from datetime import date
 
     tomorrow = date.today() + timedelta(days=1)
 
@@ -164,14 +234,20 @@ async def _async_daily_digest():
             admins = admins_result.scalars().all()
             for admin in admins:
                 if str(admin.id) not in admin_tasks:
-                    admin_tasks[str(admin.id)] = {"user": admin, "tasks": [], "projects": {}}
+                    admin_tasks[str(admin.id)] = {
+                        "user": admin,
+                        "tasks": [],
+                        "projects": {},
+                    }
                 admin_tasks[str(admin.id)]["tasks"].append(task)
                 admin_tasks[str(admin.id)]["projects"][str(project.id)] = project.name
 
         # Send digest to each admin
         for admin_data in admin_tasks.values():
             try:
-                await send_daily_digest_email(admin_data["user"], admin_data["tasks"], admin_data["projects"])
+                await send_daily_digest_email(
+                    admin_data["user"], admin_data["tasks"], admin_data["projects"]
+                )
             except Exception as e:
                 logger.error(f"Daily digest failed: {e}")
 
@@ -185,14 +261,55 @@ async def _async_sync_all_github():
     from services.github_service import sync_repo_issues
 
     async with AsyncSessionLocal() as db:
-        result = await db.execute(select(Project).where(Project.repo_url != None))
+        result = await db.execute(select(Project).where(Project.repo_url is not None))
         projects = result.scalars().all()
-        
+
         for project in projects:
             if "github.com" in project.repo_url:
                 try:
                     await sync_repo_issues(str(project.id), project.repo_url, db)
                 except Exception as e:
                     logger.error(f"Periodic sync failed for {project.id}: {e}")
-        
+
         logger.info(f"Periodic GitHub sync completed for {len(projects)} projects")
+
+
+async def _async_slack_notify(
+    *,
+    project_id: str,
+    event: str,
+    message: str,
+    assignee_user_id: str | None,
+    mentioned_usernames: list[str],
+):
+    from core.database import AsyncSessionLocal
+    from services.slack import notify_project_channel
+
+    async with AsyncSessionLocal() as db:
+        await notify_project_channel(
+            db,
+            project_id=project_id,
+            event=event,
+            message=message,
+            assignee_user_id=assignee_user_id,
+            mentioned_usernames=mentioned_usernames,
+        )
+
+
+async def _async_deliver_webhook(
+    *,
+    webhook_id: str,
+    project_id: str,
+    event: str,
+    payload: dict,
+    attempt: int,
+) -> tuple[bool, str | None]:
+    from services.webhooks import deliver_webhook
+
+    return await deliver_webhook(
+        webhook_id=webhook_id,
+        project_id=project_id,
+        event=event,
+        payload=payload,
+        attempt=attempt,
+    )

@@ -1,14 +1,15 @@
 from datetime import datetime, date
 from uuid import UUID
-from pydantic import BaseModel, EmailStr, field_validator
+from pydantic import BaseModel, EmailStr, Field, field_validator
 
 
 # ─── Auth Schemas ──────────────────────────────────────────────────────────────
 
+
 class UserRegister(BaseModel):
-    name: str
+    name: str = Field(..., min_length=1, max_length=100)
     email: EmailStr
-    password: str
+    password: str = Field(..., min_length=8, max_length=72)
 
     @field_validator("password")
     @classmethod
@@ -34,6 +35,7 @@ class RefreshRequest(BaseModel):
 
 
 # ─── User Schemas ──────────────────────────────────────────────────────────────
+
 
 class UserOut(BaseModel):
     id: UUID
@@ -61,28 +63,32 @@ class OnboardingSetup(BaseModel):
     @classmethod
     def username_format(cls, v: str) -> str:
         import re
+
         v = v.strip().lower()
         if len(v) < 3:
             raise ValueError("Username must be at least 3 characters")
         if len(v) > 30:
             raise ValueError("Username must be at most 30 characters")
-        if not re.match(r'^[a-z0-9_\-]+$', v):
-            raise ValueError("Username can only contain letters, numbers, underscores, and hyphens")
+        if not re.match(r"^[a-z0-9_\-]+$", v):
+            raise ValueError(
+                "Username can only contain letters, numbers, underscores, and hyphens"
+            )
         return v
 
 
 # ─── Project Schemas ───────────────────────────────────────────────────────────
 
+
 class ProjectCreate(BaseModel):
-    name: str
-    description: str | None = None
+    name: str = Field(..., min_length=1, max_length=200)
+    description: str | None = Field(default=None, max_length=5000)
     repo_url: str | None = None
     deadline: str | None = None  # ISO date string YYYY-MM-DD
 
 
 class ProjectUpdate(BaseModel):
-    name: str | None = None
-    description: str | None = None
+    name: str | None = Field(default=None, min_length=1, max_length=200)
+    description: str | None = Field(default=None, max_length=5000)
     repo_url: str | None = None
     deadline: str | None = None
 
@@ -119,22 +125,25 @@ class MemberOut(BaseModel):
 
 # ─── Task Schemas ──────────────────────────────────────────────────────────────
 
+
 class TaskCreate(BaseModel):
     project_id: str
-    title: str
-    description: str | None = None
+    title: str = Field(..., min_length=1, max_length=500)
+    description: str | None = Field(default=None, max_length=10000)
     status: str = "todo"
     priority: str = "medium"
+    story_points: int | None = Field(default=None, ge=0, le=100)
     assignee_id: str | None = None
     due_date: str | None = None
     position: int = 0
 
 
 class TaskUpdate(BaseModel):
-    title: str | None = None
-    description: str | None = None
+    title: str | None = Field(default=None, min_length=1, max_length=500)
+    description: str | None = Field(default=None, max_length=10000)
     status: str | None = None
     priority: str | None = None
+    story_points: int | None = Field(default=None, ge=0, le=100)
     assignee_id: str | None = None
     due_date: str | None = None
     position: int | None = None
@@ -152,6 +161,7 @@ class TaskOut(BaseModel):
     description: str | None
     status: str
     priority: str
+    story_points: int | None
     assignee_id: UUID | None
     due_date: date | None
     alert_sent: bool
@@ -161,11 +171,31 @@ class TaskOut(BaseModel):
     created_at: datetime
     updated_at: datetime
     assignee: UserOut | None = None
+    comment_count: int = 0
+
+    model_config = {"from_attributes": True}
+
+
+class CommentCreate(BaseModel):
+    content: str = Field(..., min_length=1, max_length=5000)
+    parent_comment_id: str | None = None
+
+
+class CommentOut(BaseModel):
+    id: UUID
+    task_id: UUID
+    author_id: UUID
+    content: str
+    parent_comment_id: UUID | None
+    created_at: datetime
+    author: UserOut | None = None
+    replies: list["CommentOut"] = []
 
     model_config = {"from_attributes": True}
 
 
 # ─── Chat Schemas ──────────────────────────────────────────────────────────────
+
 
 class ChannelCreate(BaseModel):
     project_id: str | None = None
@@ -199,17 +229,46 @@ class MessageOut(BaseModel):
 
 # ─── AI Schemas ────────────────────────────────────────────────────────────────
 
+
 class AIChatMessage(BaseModel):
     role: str  # user|assistant
     content: str
 
 
 class AIChatRequest(BaseModel):
-    message: str
+    message: str = Field(..., min_length=1, max_length=10000)
     history: list[AIChatMessage] = []
 
 
+class AIGenerateTasksRequest(BaseModel):
+    project_id: str
+    project_goal: str = Field(..., min_length=1, max_length=5000)
+    context: str | None = Field(default=None, max_length=10000)
+
+
+class AITranscriptRequest(BaseModel):
+    transcript: str = Field(..., min_length=10, max_length=50000)
+    project_id: str
+
+
+class AIImproveTextRequest(BaseModel):
+    text: str = Field(..., min_length=1, max_length=10000)
+    context: str = Field(default="task_description")  # task_description | pr_summary
+
+    @field_validator("context")
+    @classmethod
+    def valid_context(cls, v: str) -> str:
+        if v not in ("task_description", "pr_summary"):
+            raise ValueError("context must be task_description or pr_summary")
+        return v
+
+
+class AIAcceptTasksRequest(BaseModel):
+    task_ids: list[str] = Field(..., min_length=1)
+
+
 # ─── Commit Schemas ────────────────────────────────────────────────────────────
+
 
 class CommitOut(BaseModel):
     id: UUID
@@ -225,6 +284,7 @@ class CommitOut(BaseModel):
 
 
 # ─── Notification Schemas ──────────────────────────────────────────────────────
+
 
 class NotificationOut(BaseModel):
     id: UUID

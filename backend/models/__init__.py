@@ -7,6 +7,10 @@ from models.channel_member import ChannelMember
 from models.message import Message
 from models.commit import Commit
 from models.notification import Notification
+from models.comment import Comment
+from models.activity import Activity
+from models.integrations import SlackIntegration
+from models.webhooks import Webhook, WebhookDelivery
 
 __all__ = [
     "User",
@@ -18,4 +22,9 @@ __all__ = [
     "Message",
     "Commit",
     "Notification",
+    "Comment",
+    "Activity",
+    "SlackIntegration",
+    "Webhook",
+    "WebhookDelivery",
 ]

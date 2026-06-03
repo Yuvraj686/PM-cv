@@ -2,11 +2,11 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Loader2, CheckCircle2 } from 'lucide-react';
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+import { Loader2 } from 'lucide-react';
 
 import { Suspense } from 'react';
+
+import { apiClient } from '@/lib/api-client';
 
 function VerifyEmailContent() {
   const router = useRouter();
@@ -29,33 +29,23 @@ function VerifyEmailContent() {
     // Verify email
     const verifyEmail = async () => {
       try {
-        const response = await fetch(`${API_URL}/api/auth/email/verify-email?token=${token}`, {
-          method: 'GET',
-        });
+        await apiClient.get(`/api/auth/email/verify-email?token=${token}`);
+        setState('success');
+      } catch (err: any) {
+        const detail = err.message || 'Verification failed';
 
-        if (response.ok) {
-          setState('success');
+        if (detail.toLowerCase().includes('expired')) {
+          setErrorType('expired');
+          setErrorMessage('Link expired');
+        } else if (detail.toLowerCase().includes('invalid')) {
+          setErrorType('invalid');
+          setErrorMessage('Invalid verification link');
         } else {
-          const data = await response.json();
-          const detail = data.detail || 'Verification failed';
-
-          if (detail.includes('expired')) {
-            setErrorType('expired');
-            setErrorMessage('Link expired');
-          } else if (detail.includes('invalid')) {
-            setErrorType('invalid');
-            setErrorMessage('Invalid verification link');
-          } else {
-            setErrorType('unknown');
-            setErrorMessage('An error occurred during verification');
-          }
-
-          setState('error');
+          setErrorType('unknown');
+          setErrorMessage(detail);
         }
-      } catch (err) {
+
         setState('error');
-        setErrorType('unknown');
-        setErrorMessage('An error occurred. Please contact support.');
       }
     };
 
@@ -82,20 +72,10 @@ function VerifyEmailContent() {
     }
 
     try {
-      const response = await fetch(`${API_URL}/api/auth/email/resend-verification`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email }),
-      });
-
-      if (response.ok) {
-        setErrorMessage('Verification email sent! Check your inbox.');
-      } else {
-        const data = await response.json();
-        setErrorMessage(data.detail || 'Failed to resend verification email');
-      }
-    } catch (err) {
-      setErrorMessage('An error occurred. Please try again.');
+      await apiClient.post('/api/auth/email/resend-verification', { email });
+      setErrorMessage('Verification email sent! Check your inbox.');
+    } catch (err: any) {
+      setErrorMessage(err.message || 'Failed to resend verification email');
     }
   };
 

@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { Loader2, Mail } from 'lucide-react';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+import { apiClient } from '@/lib/api-client';
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState('');
@@ -18,21 +18,11 @@ export default function ForgotPasswordPage() {
     setLoading(true);
 
     try {
-      const response = await fetch(`${API_URL}/api/auth/email/forgot-password`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email }),
-      });
-
-      if (response.ok) {
-        setSubmittedEmail(email);
-        setSuccess(true);
-      } else {
-        const data = await response.json();
-        setError(data.detail || 'Failed to send reset link');
-      }
-    } catch (err) {
-      setError('An error occurred. Please try again.');
+      await apiClient.post('/api/auth/email/forgot-password', { email });
+      setSubmittedEmail(email);
+      setSuccess(true);
+    } catch (err: any) {
+      setError(err.message || 'Failed to send reset link');
     } finally {
       setLoading(false);
     }
@@ -86,7 +76,7 @@ export default function ForgotPasswordPage() {
         {/* Header */}
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-white mb-2">Forgot your password?</h1>
-          <p className="text-white/60">Enter your email and we'll send a reset link.</p>
+          <p className="text-white/60">Enter your email and we&apos;ll send a reset link.</p>
         </div>
 
         {/* Card */}

@@ -13,14 +13,26 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const user = useAuthStore((s) => s.user);
   const [projects, setProjects] = useState<any[]>([]);
 
+  // Fetch user profile if not already loaded
   useEffect(() => {
     if (!user?.id) {
       api.get('/api/users/me').then((res) => setUser(res.data)).catch(() => {});
     }
-    api.get('/api/projects').then((res) => {
-      setProjects(res.data.map((p: any, i: number) => ({ ...p, color: PROJECT_COLORS[i % PROJECT_COLORS.length] })));
-    }).catch(() => {});
   }, []);
+
+  // Fetch projects — re-run whenever user.id becomes available
+  useEffect(() => {
+    api.get('/api/projects')
+      .then((res) => {
+        setProjects(
+          res.data.map((p: any, i: number) => ({
+            ...p,
+            color: PROJECT_COLORS[i % PROJECT_COLORS.length],
+          }))
+        );
+      })
+      .catch(() => {});
+  }, [user?.id]); // re-fetch when user id is resolved
 
   return (
     <div className="flex h-screen overflow-hidden" style={{ background: 'var(--bloom-bg)' }}>

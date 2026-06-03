@@ -1,17 +1,18 @@
 import httpx
-import logging
+import structlog
 from datetime import datetime
 from core.config import settings
 from pathlib import Path
-import os
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger()
+
 
 async def send_verification_email(to: str, name: str, token: str):
     """Send email verification with dark theme HTML."""
+    logger.info("send_verification_email_started", to=to, name=name)
     subject = "Verify your ProjectHub email"
     verification_url = f"{settings.FRONTEND_URL}/verify-email?token={token}"
-    
+
     html_body = f"""
     <html style="font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;">
     <body style="margin: 0; padding: 0; background-color: #0F1117;">
@@ -53,41 +54,46 @@ async def send_verification_email(to: str, name: str, token: str):
     </body>
     </html>
     """
-    
-    if not settings.RESEND_API_KEY:
-        logger.info(f"📧 VERIFICATION EMAIL (Development Mode)")
+
+    if not settings.EMAIL_API_KEY:
+        logger.info("📧 VERIFICATION EMAIL (Development Mode)")
         logger.info(f"   To: {to}")
         logger.info(f"   Subject: {subject}")
-        logger.info(f"   Verification Link: {settings.FRONTEND_URL}/verify-email?token={token}")
+        logger.info(
+            f"   Verification Link: {settings.FRONTEND_URL}/verify-email?token={token}"
+        )
         return
-    
+
     try:
         async with httpx.AsyncClient() as client:
             response = await client.post(
-                "https://api.resend.com/emails",
-                headers={"Authorization": f"Bearer {settings.RESEND_API_KEY}"},
+                settings.EMAIL_API_URL,
+                headers={"Authorization": f"Bearer {settings.EMAIL_API_KEY}"},
                 json={
                     "from": settings.FROM_EMAIL,
                     "to": to,
                     "subject": subject,
-                    "html": html_body
-                }
+                    "html": html_body,
+                },
             )
             response.raise_for_status()
             logger.info(f"✅ Verification email sent to {to}")
     except Exception as e:
-        logger.error(f"Failed to send email via Resend (status 403 usually means invalid API key)")
-        logger.info(f"📧 VERIFICATION EMAIL (Fallback - Development Mode)")
+        logger.error(f"Failed to send verification email: {e}")
+        logger.info("📧 VERIFICATION EMAIL (Fallback - Development Mode)")
         logger.info(f"   To: {to}")
         logger.info(f"   Subject: {subject}")
-        logger.info(f"   Verification Link: {settings.FRONTEND_URL}/verify-email?token={token}")
+        logger.info(
+            f"   Verification Link: {settings.FRONTEND_URL}/verify-email?token={token}"
+        )
 
 
 async def send_password_reset_email(to: str, name: str, token: str):
     """Send password reset email with dark theme HTML."""
+    logger.info("send_password_reset_email_started", to=to, name=name)
     subject = "Reset your ProjectHub password"
     reset_url = f"{settings.FRONTEND_URL}/reset-password?token={token}"
-    
+
     html_body = f"""
     <html style="font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;">
     <body style="margin: 0; padding: 0; background-color: #0F1117;">
@@ -129,47 +135,52 @@ async def send_password_reset_email(to: str, name: str, token: str):
     </body>
     </html>
     """
-    
-    if not settings.RESEND_API_KEY:
-        logger.info(f"📧 PASSWORD RESET EMAIL (Development Mode)")
+
+    if not settings.EMAIL_API_KEY:
+        logger.info("📧 PASSWORD RESET EMAIL (Development Mode)")
         logger.info(f"   To: {to}")
         logger.info(f"   Subject: {subject}")
-        logger.info(f"   Reset Link: {settings.FRONTEND_URL}/reset-password?token={token}")
+        logger.info(
+            f"   Reset Link: {settings.FRONTEND_URL}/reset-password?token={token}"
+        )
         return
-    
+
     try:
         async with httpx.AsyncClient() as client:
             response = await client.post(
-                "https://api.resend.com/emails",
-                headers={"Authorization": f"Bearer {settings.RESEND_API_KEY}"},
+                settings.EMAIL_API_URL,
+                headers={"Authorization": f"Bearer {settings.EMAIL_API_KEY}"},
                 json={
                     "from": settings.FROM_EMAIL,
                     "to": to,
                     "subject": subject,
-                    "html": html_body
-                }
+                    "html": html_body,
+                },
             )
             response.raise_for_status()
             logger.info(f"✅ Password reset email sent to {to}")
     except Exception as e:
-        logger.error(f"Failed to send email via Resend (status 403 usually means invalid API key)")
-        logger.info(f"📧 PASSWORD RESET EMAIL (Fallback - Development Mode)")
+        logger.error(f"Failed to send password reset email: {e}")
+        logger.info("📧 PASSWORD RESET EMAIL (Fallback - Development Mode)")
         logger.info(f"   To: {to}")
         logger.info(f"   Subject: {subject}")
-        logger.info(f"   Reset Link: {settings.FRONTEND_URL}/reset-password?token={token}")
+        logger.info(
+            f"   Reset Link: {settings.FRONTEND_URL}/reset-password?token={token}"
+        )
 
 
 async def send_welcome_email(to: str, name: str, provider: str):
     """Send welcome email with dark theme HTML."""
+    logger.info("send_welcome_email_started", to=to, name=name, provider=provider)
     subject = "Welcome to ProjectHub!"
     dashboard_url = f"{settings.FRONTEND_URL}/dashboard"
-    
+
     provider_text = {
         "google": "Google",
         "github": "GitHub",
-        "email": "email and password"
+        "email": "email and password",
     }.get(provider, provider)
-    
+
     html_body = f"""
     <html style="font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;">
     <body style="margin: 0; padding: 0; background-color: #0F1117;">
@@ -213,22 +224,22 @@ async def send_welcome_email(to: str, name: str, provider: str):
     </body>
     </html>
     """
-    
-    if not settings.RESEND_API_KEY:
+
+    if not settings.EMAIL_API_KEY:
         _mock_email(to, subject)
         return
-    
+
     try:
         async with httpx.AsyncClient() as client:
             response = await client.post(
-                "https://api.resend.com/emails",
-                headers={"Authorization": f"Bearer {settings.RESEND_API_KEY}"},
+                settings.EMAIL_API_URL,
+                headers={"Authorization": f"Bearer {settings.EMAIL_API_KEY}"},
                 json={
                     "from": settings.FROM_EMAIL,
                     "to": to,
                     "subject": subject,
-                    "html": html_body
-                }
+                    "html": html_body,
+                },
             )
             response.raise_for_status()
             logger.info(f"Welcome email sent to {to}")
@@ -242,8 +253,8 @@ def _mock_email(to: str, subject: str):
     Path("/tmp/emails").mkdir(parents=True, exist_ok=True)
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     filename = f"/tmp/emails/{to.replace('@', '_')}_{timestamp}.txt"
-    
+
     with open(filename, "w") as f:
         f.write(f"Subject: {subject}\nTo: {to}\n")
-    
+
     logger.info(f"MOCK EMAIL → {filename}")

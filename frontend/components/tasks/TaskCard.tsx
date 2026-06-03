@@ -1,6 +1,6 @@
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { Calendar, Pencil, Trash2 } from 'lucide-react';
+import { Calendar, Pencil, Trash2, MessageSquare } from 'lucide-react';
 
 const TAG_COLORS: Record<string, { bg: string; color: string }> = {
   critical: { bg: '#FDEEE9', color: '#E07A5F' },
@@ -75,9 +75,32 @@ export function TaskCard({
       </div>
 
       {/* Title */}
-      <h3 className="text-sm font-medium leading-snug mb-2 line-clamp-2" style={{ color: 'var(--bloom-text)' }}>
-        {task.title}
-      </h3>
+      <div className="flex items-start justify-between gap-2 mb-2">
+        <h3 className="text-sm font-medium leading-snug line-clamp-2 flex-1" style={{ color: 'var(--bloom-text)' }}>
+          {task.title}
+        </h3>
+        <div className="shrink-0 flex items-center gap-1">
+          {task.story_points !== null && task.story_points !== undefined && (
+            <span
+              className="text-[10px] font-semibold px-1.5 py-0.5 rounded-md"
+              style={{ background: 'var(--bloom-yellow-bg)', color: 'var(--bloom-yellow)' }}
+              title={`${task.story_points} story point${task.story_points === 1 ? '' : 's'}`}
+            >
+              {task.story_points} SP
+            </span>
+          )}
+          {(task.comment_count ?? 0) > 0 && (
+            <span
+              className="flex items-center gap-0.5 text-[10px] font-medium px-1.5 py-0.5 rounded-md"
+              style={{ background: 'var(--bloom-purple-bg)', color: 'var(--bloom-purple)' }}
+              title={`${task.comment_count} comment${task.comment_count > 1 ? 's' : ''}`}
+            >
+              <MessageSquare size={10} />
+              {task.comment_count}
+            </span>
+          )}
+        </div>
+      </div>
 
       {/* Due date */}
       {task.due_date && (

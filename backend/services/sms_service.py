@@ -1,37 +1,35 @@
-import logging
+import structlog
 from datetime import datetime
 from pathlib import Path
-from core.config import settings
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger()
+
 
 def send_otp_sms(phone_number: str, otp: str):
-    """Send OTP SMS via Twilio."""
-    if not settings.TWILIO_ACCOUNT_SID or not settings.TWILIO_AUTH_TOKEN or not settings.TWILIO_PHONE_NUMBER:
-        _mock_sms(phone_number, otp)
-        return
-    
-    try:
-        from twilio.rest import Client
-        client = Client(settings.TWILIO_ACCOUNT_SID, settings.TWILIO_AUTH_TOKEN)
-        message = client.messages.create(
-            body=f"Your ProjectHub verification code is: {otp}\nValid for 10 minutes. Do not share this code.",
-            from_=settings.TWILIO_PHONE_NUMBER,
-            to=phone_number
-        )
-        logger.info(f"OTP SMS sent to {phone_number} (SID: {message.sid})")
-    except Exception as e:
-        logger.error(f"Failed to send OTP SMS: {e}")
-        _mock_sms(phone_number, otp)
+    """Send OTP SMS — logs to console (no external SMS provider configured)."""
+    logger.info("send_otp_sms_started", phone_number=mask_phone(phone_number))
+    logger.info(f"📱 OTP SMS → {mask_phone(phone_number)}: {otp}")
+    _mock_sms(phone_number, otp)
 
 
 def _mock_sms(phone_number: str, otp: str):
-    """Fallback: write SMS to file when Twilio is unavailable."""
+    """Write OTP to a local file for development/testing."""
     Path("/tmp/sms").mkdir(parents=True, exist_ok=True)
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     filename = f"/tmp/sms/{phone_number.replace('+', '')}_{timestamp}.txt"
-    
+
     with open(filename, "w") as f:
-        f.write(f"To: {phone_number}\nOTP: {otp}\nMessage: Your ProjectHub verification code is: {otp}\nValid for 10 minutes. Do not share this code.\n")
-    
+        f.write(
+            f"To: {phone_number}\n"
+            f"OTP: {otp}\n"
+            f"Message: Your ProjectHub verification code is: {otp}\n"
+            f"Valid for 10 minutes. Do not share this code.\n"
+        )
+
     logger.info(f"MOCK SMS → {filename}")
+
+
+def mask_phone(phone: str) -> str:
+    if len(phone) < 5:
+        return phone
+    return phone[:3] + "***" + phone[-2:]

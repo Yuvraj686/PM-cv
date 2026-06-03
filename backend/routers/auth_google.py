@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, BackgroundTasks, Depends
+from fastapi import APIRouter, BackgroundTasks, Depends
 from fastapi.responses import RedirectResponse
 import httpx
 from core.config import settings
@@ -28,9 +28,9 @@ async def google_auth():
         "response_type": "code",
         "scope": "openid email profile",
         "access_type": "offline",
-        "prompt": "select_account"
+        "prompt": "select_account",
     }
-    
+
     query_string = "&".join([f"{k}={v}" for k, v in params.items()])
     return RedirectResponse(url=f"{GOOGLE_AUTH_URL}?{query_string}")
 
@@ -39,7 +39,7 @@ async def google_auth():
 async def google_callback(
     code: str,
     db: AsyncSession = Depends(get_db),
-    bg_tasks: BackgroundTasks = BackgroundTasks()
+    bg_tasks: BackgroundTasks = BackgroundTasks(),
 ):
     """Handle Google OAuth callback."""
     try:
@@ -49,35 +49,37 @@ async def google_callback(
             "client_id": settings.GOOGLE_CLIENT_ID,
             "client_secret": settings.GOOGLE_CLIENT_SECRET,
             "redirect_uri": settings.GOOGLE_REDIRECT_URI,
-            "grant_type": "authorization_code"
+            "grant_type": "authorization_code",
         }
-        
+
         async with httpx.AsyncClient() as client:
             token_response = await client.post(GOOGLE_TOKEN_URL, data=token_data)
             token_response.raise_for_status()
             token_json = token_response.json()
             access_token = token_json.get("access_token")
-        
+
         if not access_token:
-            return RedirectResponse(url=f"{settings.FRONTEND_URL}/login?error=google_failed")
-        
+            return RedirectResponse(
+                url=f"{settings.FRONTEND_URL}/login?error=google_failed"
+            )
+
         # Step 2: Get user info from Google
         async with httpx.AsyncClient() as client:
             headers = {"Authorization": f"Bearer {access_token}"}
             user_response = await client.get(GOOGLE_USER_URL, headers=headers)
             user_response.raise_for_status()
             user_data = user_response.json()
-        
+
         google_id = user_data.get("id")
         email = user_data.get("email")
         name = user_data.get("name")
         picture = user_data.get("picture")
-        
+
         # Step 3: Find or create user
         # Check by google_id first
         result = await db.execute(select(User).where(User.google_id == google_id))
         user = result.scalar_one_or_none()
-        
+
         if user:
             # Update avatar if empty and update last_login
             if not user.avatar_url and picture:
@@ -88,7 +90,7 @@ async def google_callback(
             # Check by email
             result = await db.execute(select(User).where(User.email == email))
             user = result.scalar_one_or_none()
-            
+
             if user:
                 # Link google_id to existing user
                 user.google_id = google_id
@@ -107,20 +109,19 @@ async def google_callback(
                     avatar_url=picture,
                     auth_provider="google",
                     is_verified=True,
-                    last_login=datetime.utcnow()
+                    last_login=datetime.utcnow(),
                 )
                 db.add(user)
                 await db.commit()
                 await db.refresh(user)
-                
+
                 # Send welcome email
                 bg_tasks.add_task(send_welcome_email, email, name, "google")
-                is_new_user = True
-        
+
         # Step 4: Issue JWT tokens
         access_jwt = create_access_token({"sub": str(user.id), "email": user.email})
         refresh_jwt = create_refresh_token({"sub": str(user.id), "email": user.email})
-        
+
         # Step 5: Redirect to frontend with tokens
         # New users who haven't set a username yet go to onboarding
         needs_onboarding = not user.onboarding_complete
@@ -130,7 +131,9 @@ async def google_callback(
             f"&needs_onboarding={'true' if needs_onboarding else 'false'}"
         )
         return RedirectResponse(url=callback_url)
-    
+
     except Exception as e:
         logger.error(f"Google OAuth error: {e}")
-        return RedirectResponse(url=f"{settings.FRONTEND_URL}/login?error=google_failed")
+        return RedirectResponse(
+            url=f"{settings.FRONTEND_URL}/login?error=google_failed"
+        )

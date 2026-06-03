@@ -1,12 +1,10 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Loader2, Eye, EyeOff, CheckCircle2 } from 'lucide-react';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-
-import { Suspense } from 'react';
+import { apiClient } from '@/lib/api-client';
 
 function ResetPasswordContent() {
   const router = useRouter();
@@ -70,30 +68,20 @@ function ResetPasswordContent() {
     }
 
     try {
-      const response = await fetch(`${API_URL}/api/auth/email/reset-password`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          token,
-          new_password: form.password,
-        }),
+      await apiClient.post('/api/auth/email/reset-password', {
+        token,
+        new_password: form.password,
       });
+      setState('success');
+    } catch (err: any) {
+      const detail = err.message || 'Failed to reset password';
 
-      if (response.ok) {
-        setState('success');
+      if (detail.toLowerCase().includes('invalid') || detail.toLowerCase().includes('expired')) {
+        setState('error');
+        setError('Invalid or expired reset link');
       } else {
-        const data = await response.json();
-        const detail = data.detail || 'Failed to reset password';
-
-        if (detail.includes('invalid') || detail.includes('expired')) {
-          setState('error');
-          setError('Invalid or expired reset link');
-        } else {
-          setError(detail);
-        }
+        setError(detail);
       }
-    } catch (err) {
-      setError('An error occurred. Please try again.');
     } finally {
       setLoading(false);
     }

@@ -1,0 +1,64 @@
+services:
+  # 1. Backend Web Service (FastAPI)
+  - type: web
+    name: projecthub-backend
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    rootDirectory: backend
+    envVars:
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: projecthub-redis
+          property: connectionString
+      # Add other env vars here or in the Render Dashboard
+      # DATABASE_URL, SECRET_KEY, etc.
+
+  # 2. Frontend Web Service (Next.js)
+  - type: web
+    name: projecthub-frontend
+    env: node
+    buildCommand: npm install && npm run build
+    startCommand: npm run start
+    rootDirectory: frontend
+    envVars:
+      - key: NEXT_PUBLIC_API_URL
+        value: https://projecthub-backend.onrender.com # Change this to your backend URL
+      - key: NEXT_PUBLIC_WS_URL
+        value: wss://projecthub-backend.onrender.com # Change this to your backend URL
+
+  # 3. Celery Worker (Background Worker)
+  - type: worker
+    name: projecthub-worker
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: celery -A celery_worker worker --loglevel=info --concurrency=2
+    rootDirectory: backend
+    envVars:
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: projecthub-redis
+          property: connectionString
+
+  # 4. Celery Beat (Background Worker)
+  - type: worker
+    name: projecthub-beat
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: python -m celery -A celery_worker.celery_app beat --loglevel=info
+    rootDirectory: backend
+    envVars:
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: projecthub-redis
+          property: connectionString
+
+# 5. Redis Instance
+databases:
+  - name: projecthub-redis
+    type: redis
+    plan: free # Use free tier for development
+    ipAllowList: [] # Only allow internal connections

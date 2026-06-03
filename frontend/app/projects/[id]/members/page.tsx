@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
-import { UserPlus, Shield, Loader2, Trash2, Mail } from 'lucide-react';
+import { UserPlus, Loader2, Trash2, Mail } from 'lucide-react';
 import api from '@/lib/api';
 import { useAuthStore } from '@/lib/store';
 import { toast } from 'sonner';
@@ -40,7 +40,10 @@ export default function MembersPage() {
     finally { setLoading(false); }
   };
 
-  useEffect(() => { fetchMembers(); }, [id]);
+  useEffect(() => {
+    fetchMembers();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id]);
 
   const handleSearch = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const query = e.target.value;
