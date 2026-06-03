@@ -1,4 +1,5 @@
 import json
+import uuid
 import logging
 from typing import Annotated, AsyncGenerator
 
@@ -25,11 +26,15 @@ from schemas.schemas import (
     AIAcceptTasksRequest,
 )
 from services.ai_service import build_project_context, stream_chat_response
-from services.ai_openai import analyze_project_risk, extract_tasks_from_transcript, stream_improve_text
+from services.ai_openai import (
+    analyze_project_risk,
+    extract_tasks_from_transcript,
+    stream_improve_text,
+)
 from services.ai_tasks import generate_tasks_celery
 from utils.ai_usage import check_and_increment_ai_usage, get_ai_usage
 from utils.exceptions import ForbiddenError, RateLimitError, NotFoundError
-from celery_worker import celery_app
+from core.celery_app import celery_app
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/ai", tags=["ai"])
@@ -61,6 +66,7 @@ async def _assert_project_member(project_id: str, user: User, db: AsyncSession) 
 
 
 # ─── Existing chat endpoints (unchanged) ───────────────────────────────────────
+
 
 @router.post("/chat/{project_id}")
 async def ai_chat(
@@ -125,6 +131,7 @@ async def get_ai_history(project_id: str, current_user: CurrentUser, db: DB):
 
 # ─── AI usage ──────────────────────────────────────────────────────────────────
 
+
 @router.get("/usage")
 async def ai_usage(current_user: CurrentUser):
     """Return remaining AI requests for today."""
@@ -132,6 +139,7 @@ async def ai_usage(current_user: CurrentUser):
 
 
 # ─── Task generator (Celery async) ─────────────────────────────────────────────
+
 
 @router.post("/generate-tasks")
 async def start_generate_tasks(
@@ -164,7 +172,11 @@ async def get_generate_tasks_result(task_id: str, current_user: CurrentUser, db:
 
     data = result.result or {}
     if data.get("status") == "error":
-        return {"status": "error", "error": data.get("error", "Unknown error"), "tasks": []}
+        return {
+            "status": "error",
+            "error": data.get("error", "Unknown error"),
+            "tasks": [],
+        }
 
     project_id = data.get("project_id")
     if project_id:
@@ -202,8 +214,9 @@ async def accept_generated_tasks(
     delete_ids = all_ids - keep_ids
 
     if delete_ids:
+        uuid_ids = [uuid.UUID(i) for i in delete_ids]
         await db.execute(
-            delete(Task).where(Task.id.in_(delete_ids), Task.project_id == project_id)
+            delete(Task).where(Task.id.in_(uuid_ids), Task.project_id == project_id)
         )
         await db.commit()
 
@@ -217,6 +230,7 @@ async def stream_generate_tasks_status(task_id: str, current_user: CurrentUser, 
 
     async def generate() -> AsyncGenerator[str, None]:
         import asyncio
+
         result = AsyncResult(task_id, app=celery_app)
         while not result.ready():
             yield f"data: {json.dumps({'status': result.state.lower(), 'chunk': ''})}\n\n"
@@ -250,6 +264,7 @@ async def stream_generate_tasks_status(task_id: str, current_user: CurrentUser, 
 
 # ─── Sprint risk analyzer ──────────────────────────────────────────────────────
 
+
 @router.post("/analyze-risk/{project_id}")
 async def analyze_risk(
     project_id: str,
@@ -275,6 +290,7 @@ async def analyze_risk(
 
 # ─── Meeting transcript → tasks ────────────────────────────────────────────────
 
+
 @router.post("/transcript-to-tasks")
 async def transcript_to_tasks(
     payload: AITranscriptRequest,
@@ -283,11 +299,14 @@ async def transcript_to_tasks(
 ):
     await _assert_project_member(payload.project_id, current_user, db)
     await _assert_ai_allowed(current_user)
-    tasks = await extract_tasks_from_transcript(payload.transcript, payload.project_id, db)
+    tasks = await extract_tasks_from_transcript(
+        payload.transcript, payload.project_id, db
+    )
     return {"tasks": tasks}
 
 
 # ─── Writing assist (streaming) ────────────────────────────────────────────────
+
 
 @router.post("/improve-text")
 async def improve_text(

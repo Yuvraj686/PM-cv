@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { Navbar } from '@/components/layout/Navbar';
-import { LayoutDashboard, CheckSquare, MessageSquare, Bot, GitCommit, Settings, Users } from 'lucide-react';
+import { LayoutDashboard, CheckSquare, MessageSquare, Bot, GitCommit, Settings, Users, Activity } from 'lucide-react';
 import { useAuthStore } from '@/lib/store';
 import api from '@/lib/api';
 
@@ -25,6 +25,7 @@ export default function ProjectLayout({ children }: { children: React.ReactNode 
   const projectNavItems = [
     { name: 'Analytics',    href: `/projects/${id}/analytics`, icon: LayoutDashboard },
     { name: 'Kanban Board', href: `/projects/${id}/tasks`,     icon: CheckSquare },
+    { name: 'Activity',     href: `/projects/${id}/activity`,  icon: Activity },
     { name: 'Team Chat',    href: `/projects/${id}/chat`,      icon: MessageSquare },
     { name: 'AI Assistant', href: `/projects/${id}/ai`,        icon: Bot },
     { name: 'Commit Feed',  href: `/projects/${id}/commits`,   icon: GitCommit },

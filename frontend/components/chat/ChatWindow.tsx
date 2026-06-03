@@ -36,8 +36,26 @@ export function ChatWindow() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const reconnectTimeoutRef = useRef<number | null>(null);
 
+  // Pagination states
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+
   const getUserNameFromMessages = (userId: string) =>
     messages.find((m) => m.sender_id === userId)?.sender?.name || 'Someone';
+
+  const scrollToBottom = (behavior: 'smooth' | 'auto' = 'smooth') => {
+    messagesEndRef.current?.scrollIntoView({ behavior });
+  };
+
+  const isNearBottom = () => {
+    const container = scrollContainerRef.current;
+    if (!container) return false;
+    const threshold = 150; // pixels from bottom
+    return container.scrollHeight - container.scrollTop - container.clientHeight < threshold;
+  };
 
   // ── Fetch channels & members ──────────────────────────────────────────────
   useEffect(() => {
@@ -84,20 +102,67 @@ export function ChatWindow() {
     setActiveChannel(found);
   }, [activeChannelId, channels, dmChannels]);
 
-  // ── Fetch history ─────────────────────────────────────────────────────────
+  // ── Fetch history with pagination ─────────────────────────────────────────
   const fetchHistory = useCallback(async () => {
     if (!activeChannelId) return;
+    setHistoryLoading(true);
     try {
-      const res = await api.get(`/api/chat/channels/${activeChannelId}/messages`);
-      setMessages(res.data);
+      const res = await api.get(`/api/chat/channels/${activeChannelId}/messages?limit=30&paginate=true`);
+      setMessages(res.data.items || []);
+      setNextCursor(res.data.next_cursor || null);
+      setHasMore(res.data.has_more || false);
+      requestAnimationFrame(() => {
+        scrollToBottom('auto');
+      });
     } catch (err) {
       console.error('Failed to fetch message history', err);
+    } finally {
+      setHistoryLoading(false);
     }
   }, [activeChannelId]);
 
   useEffect(() => {
     if (activeChannelId) fetchHistory();
   }, [activeChannelId, fetchHistory]);
+
+  // ── Load more messages (infinite scroll) ──────────────────────────────────
+  const loadMoreMessages = useCallback(async () => {
+    if (!activeChannelId || loadingMore || !hasMore || !nextCursor) return;
+    setLoadingMore(true);
+    const container = scrollContainerRef.current;
+    const scrollHeightBefore = container ? container.scrollHeight : 0;
+
+    try {
+      const res = await api.get(
+        `/api/chat/channels/${activeChannelId}/messages?limit=30&paginate=true&cursor=${nextCursor}`
+      );
+      setMessages((prev) => {
+        const newItems = res.data.items || [];
+        const prevIds = new Set(prev.map((m) => m.id));
+        const filteredNew = newItems.filter((m: any) => !prevIds.has(m.id));
+        return [...filteredNew, ...prev];
+      });
+      setNextCursor(res.data.next_cursor || null);
+      setHasMore(res.data.has_more || false);
+
+      if (container) {
+        requestAnimationFrame(() => {
+          container.scrollTop = container.scrollHeight - scrollHeightBefore;
+        });
+      }
+    } catch (err) {
+      console.error('Failed to load more messages', err);
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [activeChannelId, loadingMore, hasMore, nextCursor]);
+
+  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const target = e.currentTarget;
+    if (target.scrollTop <= 5) {
+      loadMoreMessages();
+    }
+  };
 
   // ── WebSocket connection ──────────────────────────────────────────────────
   useEffect(() => {
@@ -156,6 +221,11 @@ export function ChatWindow() {
                 if (prev.some((m) => m.id === msg.id)) return prev;
                 return [...prev, msg];
               });
+              if (isNearBottom() || msg.sender_id === userId) {
+                requestAnimationFrame(() => {
+                  scrollToBottom('smooth');
+                });
+              }
             }
           } else if (data.type === 'typing') {
             setTypingUsers((prev) => ({ ...prev, [data.user_id]: Boolean(data.is_typing) }));
@@ -215,11 +285,6 @@ export function ChatWindow() {
       console.error('openDm error', err);
     }
   };
-
-  // ── Auto-scroll ───────────────────────────────────────────────────────────
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
 
   // ── Send message ──────────────────────────────────────────────────────────
   const sendMessage = (e: React.FormEvent) => {
@@ -382,7 +447,18 @@ export function ChatWindow() {
         </div>
 
         {/* Messages */}
-        <div className="flex-1 overflow-y-auto p-5 space-y-4" style={{ background: 'var(--bloom-bg)' }}>
+        <div
+          ref={scrollContainerRef}
+          onScroll={handleScroll}
+          className="flex-1 overflow-y-auto p-5 space-y-4"
+          style={{ background: 'var(--bloom-bg)' }}
+        >
+          {loadingMore && (
+            <div className="flex justify-center py-2">
+              <Loader2 className="w-5 h-5 animate-spin" style={{ color: 'var(--bloom-coral)' }} />
+            </div>
+          )}
+
           {/* Typing indicator */}
           {Object.entries(typingUsers).some(([uid, typing]) => typing && uid !== user?.id) && (
             <p className="text-xs" style={{ color: 'var(--bloom-muted)' }}>
@@ -395,7 +471,11 @@ export function ChatWindow() {
             </p>
           )}
 
-          {messages.length === 0 ? (
+          {historyLoading ? (
+            <div className="h-full flex items-center justify-center">
+              <Loader2 className="w-6 h-6 animate-spin" style={{ color: 'var(--bloom-coral)' }} />
+            </div>
+          ) : messages.length === 0 ? (
             <div className="h-full flex flex-col items-center justify-center" style={{ color: 'var(--bloom-muted)' }}>
               <MessageSquare size={40} className="mb-3 opacity-40" />
               <p className="text-sm">No messages yet. Say hello!</p>
@@ -415,7 +495,7 @@ export function ChatWindow() {
                       style={{ background: 'var(--bloom-green-bg)', border: '1px solid #b5d5b3', color: '#2a5c28' }}
                     >
                       <p className="font-semibold mb-1">🤖 GitHub AI Summary</p>
-                      <p className="whitespace-pre-wrap">{msg.content.replace('🤖 **GitHub Push Summary**\\n\\n', '')}</p>
+                      <p className="whitespace-pre-wrap">{msg.content.replace('🤖 **GitHub Push Summary**\n\n', '')}</p>
                     </div>
                   </div>
                 );

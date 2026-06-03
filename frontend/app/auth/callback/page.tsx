@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
 import { useAuthStore } from '@/lib/store';
+import { apiClient } from '@/lib/api-client';
 
 function AuthCallbackContent() {
   const router = useRouter();
@@ -74,10 +75,7 @@ function AuthCallbackContent() {
       setTokens(accessToken, refreshToken);
 
       // Fetch user profile
-      fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/users/me`, {
-        headers: { Authorization: `Bearer ${accessToken}` },
-      })
-        .then((r) => (r.ok ? r.json() : null))
+      apiClient.get('/api/users/me')
         .then((u) => { if (u) setUser(u); })
         .catch(() => {});
 

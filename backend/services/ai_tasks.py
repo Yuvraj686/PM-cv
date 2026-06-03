@@ -3,9 +3,21 @@
 import asyncio
 import logging
 
-from celery_worker import celery_app
+from core.celery_app import celery_app
 
 logger = logging.getLogger(__name__)
+
+
+async def _run_and_cleanup(coro):
+    try:
+        return await coro
+    finally:
+        try:
+            from core.database import engine
+
+            await engine.dispose()
+        except Exception:
+            pass
 
 
 @celery_app.task(name="services.ai.generate_tasks", bind=True)
@@ -18,7 +30,11 @@ def generate_tasks_celery(
 ):
     """Generate tasks via OpenAI and auto-create them in the project."""
     return asyncio.run(
-        _async_generate_tasks(self.request.id, project_id, project_goal, context, user_id)
+        _run_and_cleanup(
+            _async_generate_tasks(
+                self.request.id, project_id, project_goal, context, user_id
+            )
+        )
     )
 
 

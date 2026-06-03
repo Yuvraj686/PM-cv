@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import './globals.css';
 import { Toaster } from 'sonner';
+import { AuthSessionWatcher } from '@/components/auth/AuthSessionWatcher';
 
 export const metadata: Metadata = {
   title: 'ProjectHub',
@@ -23,6 +24,7 @@ export default function RootLayout({
         />
       </head>
       <body style={{ fontFamily: "'Inter', sans-serif" }}>
+        <AuthSessionWatcher />
         {children}
         <Toaster
           position="bottom-right"

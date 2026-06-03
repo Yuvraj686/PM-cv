@@ -85,3 +85,46 @@ export const useNotificationStore = create<NotificationState>((set) => ({
   increment: () => set((state) => ({ unreadCount: state.unreadCount + 1 })),
   clear: () => set({ unreadCount: 0 }),
 }));
+
+interface KanbanState {
+  tasksByProject: Record<string, any[]>;
+  setProjectTasks: (projectId: string, tasks: any[]) => void;
+  getProjectTasks: (projectId: string) => any[];
+  moveTaskOptimistic: (projectId: string, taskId: string, newStatus: string) => any[];
+  revertProjectTasks: (projectId: string, tasks: any[]) => void;
+  updateTaskCommentCount: (projectId: string, taskId: string, count: number) => void;
+}
+
+export const useKanbanStore = create<KanbanState>((set, get) => ({
+  tasksByProject: {},
+  setProjectTasks: (projectId, tasks) =>
+    set((state) => ({
+      tasksByProject: { ...state.tasksByProject, [projectId]: tasks },
+    })),
+  getProjectTasks: (projectId) => get().tasksByProject[projectId] || [],
+  moveTaskOptimistic: (projectId, taskId, newStatus) => {
+    const previous = [...(get().tasksByProject[projectId] || [])];
+    set((state) => ({
+      tasksByProject: {
+        ...state.tasksByProject,
+        [projectId]: (state.tasksByProject[projectId] || []).map((t) =>
+          t.id === taskId ? { ...t, status: newStatus } : t,
+        ),
+      },
+    }));
+    return previous;
+  },
+  revertProjectTasks: (projectId, tasks) =>
+    set((state) => ({
+      tasksByProject: { ...state.tasksByProject, [projectId]: tasks },
+    })),
+  updateTaskCommentCount: (projectId, taskId, count) =>
+    set((state) => ({
+      tasksByProject: {
+        ...state.tasksByProject,
+        [projectId]: (state.tasksByProject[projectId] || []).map((t) =>
+          t.id === taskId ? { ...t, comment_count: count } : t,
+        ),
+      },
+    })),
+}));

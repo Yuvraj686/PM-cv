@@ -2,9 +2,9 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { CheckCircle, XCircle, Loader2, Github, User, AtSign, ArrowRight, Sparkles } from 'lucide-react';
+import { CheckCircle, XCircle, Loader2, Github, ArrowRight, Sparkles } from 'lucide-react';
 
-const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+import { apiClient } from '@/lib/api-client';
 
 type UsernameStatus = 'idle' | 'checking' | 'available' | 'taken' | 'invalid';
 
@@ -32,12 +32,9 @@ export default function OnboardingPage() {
       setUsernameStatus('checking');
       const timer = setTimeout(async () => {
         try {
-          const token = localStorage.getItem('access_token');
-          const res = await fetch(
-            `${API}/api/users/check-username?username=${encodeURIComponent(value)}`,
-            { headers: { Authorization: `Bearer ${token}` } }
+          const data = await apiClient.get(
+            `/api/users/check-username?username=${encodeURIComponent(value)}`
           );
-          const data = await res.json();
 
           if (data.reason === 'invalid_format') {
             setUsernameStatus('invalid');
@@ -75,27 +72,13 @@ export default function OnboardingPage() {
     setError('');
 
     try {
-      const token = localStorage.getItem('access_token');
-      const res = await fetch(`${API}/api/users/me/onboarding`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          username: username.trim().toLowerCase(),
-          github_username: githubHandle.trim() || null,
-        }),
+      await apiClient.post('/api/users/me/onboarding', {
+        username: username.trim().toLowerCase(),
+        github_username: githubHandle.trim() || null,
       });
-
-      if (res.ok) {
-        router.push('/dashboard');
-      } else {
-        const data = await res.json();
-        setError(data.detail || 'Something went wrong. Please try again.');
-      }
-    } catch {
-      setError('Network error. Please try again.');
+      router.push('/dashboard');
+    } catch (err: any) {
+      setError(err.message || 'Something went wrong. Please try again.');
     } finally {
       setSubmitting(false);
     }

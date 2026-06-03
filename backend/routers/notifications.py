@@ -31,7 +31,9 @@ async def list_notifications(current_user: CurrentUser, db: DB):
 async def mark_read(notification_id: str, current_user: CurrentUser, db: DB):
     await db.execute(
         update(Notification)
-        .where(Notification.id == notification_id, Notification.user_id == current_user.id)
+        .where(
+            Notification.id == notification_id, Notification.user_id == current_user.id
+        )
         .values(read=True)
     )
     await db.commit()
@@ -42,7 +44,7 @@ async def mark_read(notification_id: str, current_user: CurrentUser, db: DB):
 async def mark_all_read(current_user: CurrentUser, db: DB):
     await db.execute(
         update(Notification)
-        .where(Notification.user_id == current_user.id, Notification.read == False)
+        .where(Notification.user_id == current_user.id, not Notification.read)
         .values(read=True)
     )
     await db.commit()

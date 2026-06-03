@@ -1,7 +1,7 @@
 """OpenAI-powered AI features (task generation, risk analysis, etc.)."""
 
 import json
-from datetime import date, datetime, timezone
+from datetime import date
 from difflib import SequenceMatcher
 from typing import AsyncGenerator
 
@@ -19,7 +19,7 @@ from utils.sanitize import sanitize_html
 
 logger = structlog.get_logger()
 
-openai_client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
+openai_client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY or "MOCK_KEY")
 
 TASK_GENERATION_SYSTEM = """You are a project management expert. Given a project goal, generate a practical list of tasks.
 Return JSON with this exact structure:
@@ -40,7 +40,9 @@ IMPROVE_TEXT_PROMPTS = {
 }
 
 
-async def generate_tasks_json(project_goal: str, context: str | None = None) -> list[dict]:
+async def generate_tasks_json(
+    project_goal: str, context: str | None = None
+) -> list[dict]:
     user_content = f"Project goal: {project_goal}"
     if context:
         user_content += f"\n\nAdditional context:\n{context}"
@@ -73,21 +75,25 @@ async def create_tasks_from_generated(
         task = Task(
             project_id=project_id,
             title=sanitize_html(str(item.get("title", "Untitled task"))[:500]),
-            description=sanitize_html(str(item.get("description", ""))) if item.get("description") else None,
+            description=sanitize_html(str(item.get("description", "")))
+            if item.get("description")
+            else None,
             status="todo",
             priority=priority,
             position=i,
         )
         db.add(task)
         await db.flush()
-        created.append({
-            "id": str(task.id),
-            "title": task.title,
-            "description": task.description,
-            "priority": task.priority,
-            "estimated_hours": item.get("estimated_hours"),
-            "status": task.status,
-        })
+        created.append(
+            {
+                "id": str(task.id),
+                "title": task.title,
+                "description": task.description,
+                "priority": task.priority,
+                "estimated_hours": item.get("estimated_hours"),
+                "status": task.status,
+            }
+        )
     await db.commit()
     return created
 
@@ -103,12 +109,13 @@ async def fetch_risk_context(project_id: str, db: AsyncSession) -> dict:
     tasks = tasks_result.scalars().all()
 
     overdue = [
-        t for t in tasks
-        if t.due_date and t.due_date < today and t.status != "done"
+        t for t in tasks if t.due_date and t.due_date < today and t.status != "done"
     ]
     blocked = [
-        t for t in tasks
-        if t.status != "done" and (
+        t
+        for t in tasks
+        if t.status != "done"
+        and (
             (t.due_date and t.due_date < today)
             or (t.title and "blocked" in t.title.lower())
             or (t.description and "blocked" in (t.description or "").lower())
@@ -130,8 +137,14 @@ async def fetch_risk_context(project_id: str, db: AsyncSession) -> dict:
         "project_name": project.name,
         "deadline": str(project.deadline) if project.deadline else None,
         "total_tasks": len(tasks),
-        "overdue_tasks": [{"title": t.title, "due_date": str(t.due_date), "status": t.status} for t in overdue],
-        "blocked_tasks": [{"title": t.title, "status": t.status, "priority": t.priority} for t in blocked],
+        "overdue_tasks": [
+            {"title": t.title, "due_date": str(t.due_date), "status": t.status}
+            for t in overdue
+        ],
+        "blocked_tasks": [
+            {"title": t.title, "status": t.status, "priority": t.priority}
+            for t in blocked
+        ],
         "team_workload": workload,
         "status_breakdown": {
             "todo": len([t for t in tasks if t.status == "todo"]),
@@ -159,7 +172,9 @@ async def analyze_project_risk(project_id: str, db: AsyncSession) -> dict:
     return json.loads(raw)
 
 
-def fuzzy_match_member(mention: str | None, members: list[tuple[ProjectMember, User]]) -> str | None:
+def fuzzy_match_member(
+    mention: str | None, members: list[tuple[ProjectMember, User]]
+) -> str | None:
     if not mention or not members:
         return None
     mention_lower = mention.strip().lower()
@@ -198,7 +213,10 @@ async def extract_tasks_from_transcript(
         model="gpt-4o-mini",
         messages=[
             {"role": "system", "content": TRANSCRIPT_SYSTEM},
-            {"role": "user", "content": f"Team members: {', '.join(member_names) or 'Unknown'}\n\nTranscript:\n{transcript}"},
+            {
+                "role": "user",
+                "content": f"Team members: {', '.join(member_names) or 'Unknown'}\n\nTranscript:\n{transcript}",
+            },
         ],
         response_format={"type": "json_object"},
         max_tokens=2000,
@@ -209,13 +227,15 @@ async def extract_tasks_from_transcript(
     results = []
     for item in tasks:
         assignee_id = fuzzy_match_member(item.get("assignee_mention"), members)
-        results.append({
-            "title": item.get("title", ""),
-            "assignee_mention": item.get("assignee_mention"),
-            "assignee_id": assignee_id,
-            "due_date_mention": item.get("due_date_mention"),
-            "priority": item.get("priority", "medium"),
-        })
+        results.append(
+            {
+                "title": item.get("title", ""),
+                "assignee_mention": item.get("assignee_mention"),
+                "assignee_id": assignee_id,
+                "due_date_mention": item.get("due_date_mention"),
+                "priority": item.get("priority", "medium"),
+            }
+        )
     return results
 
 

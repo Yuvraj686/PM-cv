@@ -37,4 +37,7 @@ backend/scratch/
 backend/data.db
 .pytest_cache/
 *.db
+.coverage
+*.rdb
+.ruff_cache/
 

@@ -3,10 +3,14 @@ from functools import lru_cache
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
+    model_config = SettingsConfigDict(
+        env_file=".env", env_file_encoding="utf-8", extra="ignore"
+    )
 
     # Database — Supabase PostgreSQL
-    DATABASE_URL: str = "postgresql+asyncpg://postgres:password@db.xxxx.supabase.co:5432/postgres"
+    DATABASE_URL: str = (
+        "postgresql+asyncpg://postgres:password@db.xxxx.supabase.co:5432/postgres"
+    )
 
     # Redis
     REDIS_URL: str = "redis://localhost:6379/0"
@@ -49,6 +53,14 @@ class Settings(BaseSettings):
     GITHUB_CLIENT_ID: str = ""
     GITHUB_CLIENT_SECRET: str = ""
     GITHUB_REDIRECT_URI: str = "http://localhost:8000/api/auth/github/callback"
+
+    # Slack OAuth + notifications
+    SLACK_CLIENT_ID: str = ""
+    SLACK_CLIENT_SECRET: str = ""
+    SLACK_REDIRECT_URI: str = "http://localhost:8000/api/integrations/slack/callback"
+
+    # Encryption (Fernet-compatible key recommended)
+    ENCRYPTION_KEY: str = ""
 
 
 @lru_cache()

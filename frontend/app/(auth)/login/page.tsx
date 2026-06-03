@@ -2,9 +2,10 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Phone, Eye, EyeOff, Loader2, Mail } from 'lucide-react';
+import { Phone, Eye, EyeOff, Loader2 } from 'lucide-react';
 import { useAuthStore } from '@/lib/store';
 import { motion } from 'framer-motion';
+import { apiClient } from '@/lib/api-client';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
@@ -39,59 +40,53 @@ export default function LoginPage() {
     e.preventDefault();
     setError(''); setErrorType('default'); setLoading(true);
     try {
-      const response = await fetch(`${API_URL}/api/auth/email/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: emailForm.email, password: emailForm.password }),
-      });
-      if (response.ok) {
-        const data = await response.json();
-        localStorage.setItem('access_token', data.access_token);
-        localStorage.setItem('refresh_token', data.refresh_token);
-        document.cookie = `access_token=${data.access_token}; path=/`;
-        setTokens(data.access_token, data.refresh_token);
-        try {
-          const userRes = await fetch(`${API_URL}/api/users/me`, {
-            headers: { Authorization: `Bearer ${data.access_token}` },
-          });
-          if (userRes.ok) setUser(await userRes.json());
-        } catch {}
-        router.push('/dashboard');
+      const data = await apiClient.post('/api/auth/email/login', {
+        email: emailForm.email,
+        password: emailForm.password,
+      }, { skipAuth: true });
+
+      localStorage.setItem('access_token', data.access_token);
+      localStorage.setItem('refresh_token', data.refresh_token);
+      document.cookie = `access_token=${data.access_token}; path=/`;
+      setTokens(data.access_token, data.refresh_token);
+
+      try {
+        const user = await apiClient.get('/api/users/me');
+        setUser(user);
+      } catch {}
+
+      router.push('/dashboard');
+    } catch (err: any) {
+      const detail = err.message || 'Invalid email or password';
+      if (detail.includes('not registered')) {
+        router.push(`/register?error=not_registered&email=${encodeURIComponent(emailForm.email)}`);
+        return;
+      } else if (detail.includes('verify')) {
+        setError('Please verify your email first'); setErrorType('verify-email');
+      } else if (detail.includes('deactivated')) {
+        setError('Account deactivated'); setErrorType('deactivated');
       } else {
-        const data = await response.json();
-        const detail = data.detail || 'Invalid email or password';
-        if (detail.includes('not registered')) {
-          router.push(`/register?error=not_registered&email=${encodeURIComponent(emailForm.email)}`);
-          return;
-        } else if (detail.includes('verify')) {
-          setError('Please verify your email first'); setErrorType('verify-email');
-        } else if (detail.includes('deactivated')) {
-          setError('Account deactivated'); setErrorType('deactivated');
-        } else {
-          setError(detail); setErrorType('default');
-        }
+        setError(detail); setErrorType('default');
       }
-    } catch { setError('An error occurred. Please try again.'); }
-    finally { setLoading(false); }
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleSendOtp = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(''); setErrorType('default'); setLoading(true);
     try {
-      const response = await fetch(`${API_URL}/api/auth/phone/send-otp`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone_number: `${phoneForm.countryCode}${phoneForm.phone}` }),
-      });
-      if (response.ok) {
-        setOtpSent(true); setCountdown(60); setOtp(['', '', '', '', '', '']);
-        otpRefs.current[0]?.focus();
-      } else {
-        const data = await response.json(); setError(data.detail || 'Failed to send OTP');
-      }
-    } catch { setError('An error occurred. Please try again.'); }
-    finally { setLoading(false); }
+      await apiClient.post('/api/auth/phone/send-otp', {
+        phone_number: `${phoneForm.countryCode}${phoneForm.phone}`,
+      }, { skipAuth: true });
+      setOtpSent(true); setCountdown(60); setOtp(['', '', '', '', '', '']);
+      otpRefs.current[0]?.focus();
+    } catch (err: any) {
+      setError(err.message || 'Failed to send OTP');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleOtpChange = (index: number, value: string) => {
@@ -121,58 +116,56 @@ export default function LoginPage() {
     const otpCode = otp.join('');
     if (otpCode.length !== 6) { setError('Please enter all 6 digits'); setLoading(false); return; }
     try {
-      const response = await fetch(`${API_URL}/api/auth/phone/verify-otp`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone_number: `${phoneForm.countryCode}${phoneForm.phone}`, otp: otpCode }),
-      });
-      if (response.ok) {
-        const data = await response.json();
-        localStorage.setItem('access_token', data.access_token);
-        localStorage.setItem('refresh_token', data.refresh_token);
-        document.cookie = `access_token=${data.access_token}; path=/`;
-        setTokens(data.access_token, data.refresh_token);
-        try {
-          const userRes = await fetch(`${API_URL}/api/users/me`, {
-            headers: { Authorization: `Bearer ${data.access_token}` },
-          });
-          if (userRes.ok) setUser(await userRes.json());
-        } catch {}
-        router.push('/dashboard');
-      } else {
-        const data = await response.json(); setError(data.detail || 'Invalid OTP');
-        setOtp(['', '', '', '', '', '']); otpRefs.current[0]?.focus();
-      }
-    } catch { setError('An error occurred. Please try again.'); }
-    finally { setLoading(false); }
+      const data = await apiClient.post('/api/auth/phone/verify-otp', {
+        phone_number: `${phoneForm.countryCode}${phoneForm.phone}`,
+        otp: otpCode,
+      }, { skipAuth: true });
+
+      localStorage.setItem('access_token', data.access_token);
+      localStorage.setItem('refresh_token', data.refresh_token);
+      document.cookie = `access_token=${data.access_token}; path=/`;
+      setTokens(data.access_token, data.refresh_token);
+
+      try {
+        const user = await apiClient.get('/api/users/me');
+        setUser(user);
+      } catch {}
+
+      router.push('/dashboard');
+    } catch (err: any) {
+      setError(err.message || 'Invalid OTP');
+      setOtp(['', '', '', '', '', '']); otpRefs.current[0]?.focus();
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleResendOtp = async () => {
     setError(''); setLoading(true);
     try {
-      const response = await fetch(`${API_URL}/api/auth/phone/resend-otp`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone_number: `${phoneForm.countryCode}${phoneForm.phone}` }),
-      });
-      if (response.ok) { setCountdown(60); setOtp(['', '', '', '', '', '']); otpRefs.current[0]?.focus(); }
-      else { const data = await response.json(); setError(data.detail || 'Failed to resend OTP'); }
-    } catch { setError('An error occurred. Please try again.'); }
-    finally { setLoading(false); }
+      await apiClient.post('/api/auth/phone/resend-otp', {
+        phone_number: `${phoneForm.countryCode}${phoneForm.phone}`,
+      }, { skipAuth: true });
+      setCountdown(60); setOtp(['', '', '', '', '', '']); otpRefs.current[0]?.focus();
+    } catch (err: any) {
+      setError(err.message || 'Failed to resend OTP');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleResendVerificationEmail = async () => {
     setError(''); setLoading(true);
     try {
-      const response = await fetch(`${API_URL}/api/auth/email/resend-verification`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: emailForm.email }),
-      });
-      if (response.ok) setError('Verification email sent!');
-      else { const data = await response.json(); setError(data.detail || 'Failed to resend email'); }
-    } catch { setError('An error occurred. Please try again.'); }
-    finally { setLoading(false); }
+      await apiClient.post('/api/auth/email/resend-verification', {
+        email: emailForm.email,
+      }, { skipAuth: true });
+      setError('Verification email sent!');
+    } catch (err: any) {
+      setError(err.message || 'Failed to resend email');
+    } finally {
+      setLoading(false);
+    }
   };
 
   /* ─── Google SVG ─── */

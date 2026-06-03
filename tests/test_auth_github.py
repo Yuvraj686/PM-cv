@@ -5,6 +5,7 @@ FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000")
 SCREENSHOTS_DIR = "/tmp/screenshots"
 
 
+@pytest.mark.e2e
 class TestGitHubAuth:
     """Test GitHub OAuth UI elements."""
 

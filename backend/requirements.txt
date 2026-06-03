@@ -25,3 +25,6 @@ psycopg2-binary==2.9.9
 structlog>=24.1.0
 sentry-sdk[fastapi]>=2.0.0
 bleach>=6.1.0
+cryptography>=42.0.0
+kombu>=5.3.4
+starlette==1.0.0
