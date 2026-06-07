@@ -27,4 +27,4 @@ sentry-sdk[fastapi]>=2.0.0
 bleach>=6.1.0
 cryptography>=42.0.0
 kombu>=5.3.4
-starlette==1.0.0
+starlette>=0.37.2,<0.38.0
