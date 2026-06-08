@@ -5,6 +5,7 @@ from core.config import settings
 from pathlib import Path
 
 logger = structlog.get_logger()
+EMAIL_API_TIMEOUT = httpx.Timeout(10.0, connect=5.0)
 
 
 async def send_verification_email(to: str, name: str, token: str):
@@ -65,7 +66,7 @@ async def send_verification_email(to: str, name: str, token: str):
         return
 
     try:
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(timeout=EMAIL_API_TIMEOUT) as client:
             response = await client.post(
                 settings.EMAIL_API_URL,
                 headers={"Authorization": f"Bearer {settings.EMAIL_API_KEY}"},
@@ -146,7 +147,7 @@ async def send_password_reset_email(to: str, name: str, token: str):
         return
 
     try:
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(timeout=EMAIL_API_TIMEOUT) as client:
             response = await client.post(
                 settings.EMAIL_API_URL,
                 headers={"Authorization": f"Bearer {settings.EMAIL_API_KEY}"},
@@ -230,7 +231,7 @@ async def send_welcome_email(to: str, name: str, provider: str):
         return
 
     try:
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(timeout=EMAIL_API_TIMEOUT) as client:
             response = await client.post(
                 settings.EMAIL_API_URL,
                 headers={"Authorization": f"Bearer {settings.EMAIL_API_KEY}"},

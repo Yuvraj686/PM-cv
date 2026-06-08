@@ -7,6 +7,7 @@ from core.config import settings
 from datetime import datetime, timezone
 
 logger = structlog.get_logger()
+GITHUB_API_TIMEOUT = httpx.Timeout(10.0, connect=5.0)
 
 
 async def fetch_github_issues(repo_url: str) -> list[dict]:
@@ -28,7 +29,7 @@ async def fetch_github_issues(repo_url: str) -> list[dict]:
     if settings.GITHUB_TOKEN:
         headers["Authorization"] = f"token {settings.GITHUB_TOKEN}"
 
-    async with httpx.AsyncClient() as client:
+    async with httpx.AsyncClient(timeout=GITHUB_API_TIMEOUT) as client:
         try:
             response = await client.get(
                 api_url, headers=headers, params={"state": "all"}

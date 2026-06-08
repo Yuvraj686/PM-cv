@@ -4,6 +4,7 @@ from core.config import settings
 from models.notification import Notification
 
 logger = structlog.get_logger()
+EMAIL_API_TIMEOUT = httpx.Timeout(10.0, connect=5.0)
 
 
 async def send_deadline_alert_email(
@@ -48,7 +49,7 @@ async def send_deadline_alert_email(
     """
 
     try:
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(timeout=EMAIL_API_TIMEOUT) as client:
             response = await client.post(
                 settings.EMAIL_API_URL,
                 headers={"Authorization": f"Bearer {settings.EMAIL_API_KEY}"},
@@ -112,7 +113,7 @@ async def send_daily_digest_email(admin, tasks: list, projects: dict) -> None:
     """
 
     try:
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(timeout=EMAIL_API_TIMEOUT) as client:
             response = await client.post(
                 settings.EMAIL_API_URL,
                 headers={"Authorization": f"Bearer {settings.EMAIL_API_KEY}"},

@@ -31,7 +31,9 @@ _patch_uuid_type(PG_UUID)
 _patch_uuid_type(SQL_UUID)
 
 DATABASE_URL = settings.DATABASE_URL
-if DATABASE_URL.startswith("postgresql://"):
+if DATABASE_URL.startswith("postgres://"):
+    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql+asyncpg://", 1)
+elif DATABASE_URL.startswith("postgresql://"):
     DATABASE_URL = DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://", 1)
 
 # Remove sslmode from URL if present (causes conflicts with connect_args)

@@ -17,6 +17,7 @@ router = APIRouter(prefix="/google", tags=["google-oauth"])
 GOOGLE_AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth"
 GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token"
 GOOGLE_USER_URL = "https://www.googleapis.com/oauth2/v2/userinfo"
+GOOGLE_API_TIMEOUT = httpx.Timeout(10.0, connect=5.0)
 
 
 @router.get("/")
@@ -52,7 +53,7 @@ async def google_callback(
             "grant_type": "authorization_code",
         }
 
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(timeout=GOOGLE_API_TIMEOUT) as client:
             token_response = await client.post(GOOGLE_TOKEN_URL, data=token_data)
             token_response.raise_for_status()
             token_json = token_response.json()
@@ -64,7 +65,7 @@ async def google_callback(
             )
 
         # Step 2: Get user info from Google
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(timeout=GOOGLE_API_TIMEOUT) as client:
             headers = {"Authorization": f"Bearer {access_token}"}
             user_response = await client.get(GOOGLE_USER_URL, headers=headers)
             user_response.raise_for_status()

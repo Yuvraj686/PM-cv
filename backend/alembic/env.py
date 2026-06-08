@@ -48,8 +48,11 @@ target_metadata = Base.metadata
 
 # Get the database URL from environment
 database_url = os.getenv("DATABASE_URL")
-if database_url and "asyncpg" in database_url:
-    # Convert async URL to sync URL for alembic
+if database_url and database_url.startswith("postgres://"):
+    # Render provides postgres://; SQLAlchemy expects postgresql://.
+    database_url = database_url.replace("postgres://", "postgresql://", 1)
+elif database_url and database_url.startswith("postgresql+asyncpg://"):
+    # Convert async URL to sync URL for alembic.
     database_url = database_url.replace("postgresql+asyncpg://", "postgresql://")
 
 # other values from the config, defined by the needs of env.py,
