@@ -44,7 +44,9 @@ async def github_callback(
     """Handle GitHub OAuth callback."""
     try:
         logger.info("GitHub callback: received callback from GitHub")
-        logger.info(f"GitHub callback: configured redirect_uri={settings.GITHUB_REDIRECT_URI}")
+        logger.info(
+            f"GitHub callback: configured redirect_uri={settings.GITHUB_REDIRECT_URI}"
+        )
         logger.info(f"GitHub callback: configured frontend_url={settings.FRONTEND_URL}")
 
         if not settings.GITHUB_CLIENT_ID or not settings.GITHUB_CLIENT_SECRET:
@@ -130,7 +132,9 @@ async def github_callback(
                     )
                 emails_response.raise_for_status()
                 emails_data = emails_response.json()
-                logger.info(f"GitHub callback: received {len(emails_data)} email records")
+                logger.info(
+                    f"GitHub callback: received {len(emails_data)} email records"
+                )
 
                 for email_item in emails_data:
                     if email_item.get("primary") and email_item.get("verified"):
@@ -223,7 +227,9 @@ async def github_callback(
             "refresh_token": refresh_jwt,
             "needs_onboarding": "true" if needs_onboarding else "false",
         }
-        callback_url = f"{settings.FRONTEND_URL}/auth/callback?{urlencode(callback_params)}"
+        callback_url = (
+            f"{settings.FRONTEND_URL}/auth/callback?{urlencode(callback_params)}"
+        )
         safe_callback_url = (
             f"{settings.FRONTEND_URL}/auth/callback"
             f"?access_token=<redacted>&refresh_token=<redacted>"

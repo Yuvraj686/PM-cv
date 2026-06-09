@@ -182,9 +182,9 @@ async def _async_check_deadlines():
                         project_id=str(task.project_id),
                         event="task_overdue",
                         message=f"Task overdue: {task.title}",
-                        assignee_user_id=str(task.assignee_id)
-                        if task.assignee_id
-                        else None,
+                        assignee_user_id=(
+                            str(task.assignee_id) if task.assignee_id else None
+                        ),
                     )
                 except Exception as e:
                     logger.error(

@@ -40,7 +40,6 @@ from models.activity import Activity
 from schemas.pagination import encode_cursor, decode_cursor
 from sqlalchemy import or_, and_
 
-
 router = APIRouter(prefix="/api/projects", tags=["projects"])
 
 CurrentUser = Annotated[User, Depends(get_current_user)]
@@ -407,13 +406,15 @@ async def get_project_activity(
             "target_type": a.target_type,
             "metadata": a.metadata_ or {},
             "created_at": a.created_at.isoformat(),
-            "actor": {
-                "id": str(a.actor.id),
-                "name": a.actor.name,
-                "avatar_url": a.actor.avatar_url,
-            }
-            if a.actor
-            else None,
+            "actor": (
+                {
+                    "id": str(a.actor.id),
+                    "name": a.actor.name,
+                    "avatar_url": a.actor.avatar_url,
+                }
+                if a.actor
+                else None
+            ),
         }
 
     return {

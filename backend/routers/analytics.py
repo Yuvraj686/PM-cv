@@ -16,7 +16,6 @@ from models.task import Task
 from models.user import User
 from utils.cache import cache
 
-
 router = APIRouter(prefix="/api/projects", tags=["analytics"])
 
 CurrentUser = Annotated[User, Depends(get_current_user)]
@@ -315,9 +314,11 @@ async def get_project_cycle_time(
     return [
         {
             "status": _status_label(status),
-            "avg_days": round((totals.get(status, 0.0) / counts[status]), 2)
-            if counts.get(status)
-            else 0.0,
+            "avg_days": (
+                round((totals.get(status, 0.0) / counts[status]), 2)
+                if counts.get(status)
+                else 0.0
+            ),
         }
         for status in ordered_statuses
     ]

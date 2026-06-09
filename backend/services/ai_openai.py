@@ -75,9 +75,11 @@ async def create_tasks_from_generated(
         task = Task(
             project_id=project_id,
             title=sanitize_html(str(item.get("title", "Untitled task"))[:500]),
-            description=sanitize_html(str(item.get("description", "")))
-            if item.get("description")
-            else None,
+            description=(
+                sanitize_html(str(item.get("description", "")))
+                if item.get("description")
+                else None
+            ),
             status="todo",
             priority=priority,
             position=i,

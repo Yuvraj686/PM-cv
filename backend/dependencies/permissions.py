@@ -15,7 +15,6 @@ from sqlalchemy import select
 from core.database import get_db
 from core.dependencies import get_current_user
 
-
 # ─── Role hierarchy (higher = more permissions) ───────────────────────────────
 # owner > admin > member > viewer
 # Legacy mappings: project_lead → admin, developer → member

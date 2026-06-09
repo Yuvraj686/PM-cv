@@ -76,17 +76,12 @@ async def send_daily_digest_email(admin, tasks: list, projects: dict) -> None:
     if not settings.EMAIL_API_KEY:
         return
 
-    task_rows = "".join(
-        [
-            f"""<tr>
+    task_rows = "".join([f"""<tr>
           <td style="padding: 8px 12px; border-bottom: 1px solid #334155; color: #fff;">{t.title}</td>
           <td style="padding: 8px 12px; border-bottom: 1px solid #334155; color: #94a3b8;">{projects.get(str(t.project_id), "Unknown")}</td>
           <td style="padding: 8px 12px; border-bottom: 1px solid #334155; color: #F59E0B;">{t.priority.upper()}</td>
           <td style="padding: 8px 12px; border-bottom: 1px solid #334155; color: #94a3b8;">{t.status.replace("_", " ").title()}</td>
-        </tr>"""
-            for t in tasks
-        ]
-    )
+        </tr>""" for t in tasks])
 
     html = f"""
     <div style="font-family: Inter, sans-serif; max-width: 700px; margin: 0 auto; background: #0F1117; color: #fff; padding: 32px; border-radius: 12px;">

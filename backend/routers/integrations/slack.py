@@ -31,7 +31,6 @@ from services.slack import (
 )
 from utils.exceptions import ForbiddenError, ValidationError
 
-
 router = APIRouter(prefix="/api/integrations/slack", tags=["integrations"])
 
 CurrentUser = Annotated[User, Depends(get_current_user)]

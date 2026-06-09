@@ -23,7 +23,6 @@ from schemas.integrations import (
 )
 from utils.exceptions import NotFoundError
 
-
 router = APIRouter(prefix="/api/projects/{project_id}/webhooks", tags=["integrations"])
 
 CurrentUser = Annotated[User, Depends(get_current_user)]

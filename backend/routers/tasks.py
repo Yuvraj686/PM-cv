@@ -400,17 +400,19 @@ async def list_comments(
             "task_id": str(c.task_id),
             "author_id": str(c.author_id),
             "content": c.content,
-            "parent_comment_id": str(c.parent_comment_id)
-            if c.parent_comment_id
-            else None,
+            "parent_comment_id": (
+                str(c.parent_comment_id) if c.parent_comment_id else None
+            ),
             "created_at": c.created_at.isoformat(),
-            "author": {
-                "id": str(c.author.id),
-                "name": c.author.name,
-                "avatar_url": c.author.avatar_url,
-            }
-            if c.author
-            else None,
+            "author": (
+                {
+                    "id": str(c.author.id),
+                    "name": c.author.name,
+                    "avatar_url": c.author.avatar_url,
+                }
+                if c.author
+                else None
+            ),
             "replies": [
                 _serialize(r) for r in sorted(c.replies, key=lambda x: x.created_at)
             ],
@@ -473,9 +475,9 @@ async def create_comment(
         "task_id": str(comment.task_id),
         "author_id": str(comment.author_id),
         "content": comment.content,
-        "parent_comment_id": str(comment.parent_comment_id)
-        if comment.parent_comment_id
-        else None,
+        "parent_comment_id": (
+            str(comment.parent_comment_id) if comment.parent_comment_id else None
+        ),
         "created_at": comment.created_at.isoformat(),
         "author": {
             "id": str(author.id),

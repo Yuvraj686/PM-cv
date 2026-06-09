@@ -470,13 +470,15 @@ async def _handle_chat_message(room_id: str, sender_id: str, data: dict):
             "content": msg.content,
             "message_type": msg.message_type,
             "created_at": msg.created_at.isoformat(),
-            "sender": {
-                "id": str(msg.sender.id),
-                "name": msg.sender.name,
-                "avatar_url": msg.sender.avatar_url,
-            }
-            if msg.sender
-            else None,
+            "sender": (
+                {
+                    "id": str(msg.sender.id),
+                    "name": msg.sender.name,
+                    "avatar_url": msg.sender.avatar_url,
+                }
+                if msg.sender
+                else None
+            ),
         },
     }
     await manager.broadcast_to_room(room_id, broadcast_data)

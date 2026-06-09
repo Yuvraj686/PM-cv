@@ -32,13 +32,15 @@ def _serialize_activity(activity: Activity, actor: User | None) -> dict:
         "target_type": activity.target_type,
         "metadata": activity.metadata_ or {},
         "created_at": activity.created_at.isoformat(),
-        "actor": {
-            "id": str(actor.id),
-            "name": actor.name,
-            "avatar_url": actor.avatar_url,
-        }
-        if actor
-        else None,
+        "actor": (
+            {
+                "id": str(actor.id),
+                "name": actor.name,
+                "avatar_url": actor.avatar_url,
+            }
+            if actor
+            else None
+        ),
     }
 
 

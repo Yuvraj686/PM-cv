@@ -237,9 +237,9 @@ async def readiness():
     return JSONResponse(
         status_code=status_code,
         content={
-            "status": "ok"
-            if all_healthy
-            else ("degraded" if checks["database"] else "down"),
+            "status": (
+                "ok" if all_healthy else ("degraded" if checks["database"] else "down")
+            ),
             "checks": checks,
             "timestamp": datetime.now(timezone.utc).isoformat(),
         },
