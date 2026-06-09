@@ -38,7 +38,7 @@ jobs:
         run: black --check .
 
       - name: Run tests with coverage
-        run: pytest ../tests/ --cov=. --cov-report=xml -v
+        run: pytest -c pytest.ini ../tests/ --cov=. --cov-report=xml -v
         env:
           DATABASE_URL: "sqlite+aiosqlite:///test.db"
           REDIS_URL: "redis://localhost:6379/0"
