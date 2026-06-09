@@ -44,6 +44,7 @@ jobs:
           REDIS_URL: "redis://localhost:6379/0"
           SECRET_KEY: "test-secret-key-for-ci"
           ENV: "development"
+          PYTHONPATH: .
 
       - name: Upload coverage to Codecov
         if: github.event_name == 'push'
