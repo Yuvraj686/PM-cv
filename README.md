@@ -2,6 +2,8 @@
 
 ProjectHub is a modern, full-stack project management platform designed for efficiency and collaboration. It features AI integration, GitHub synchronization, real-time chat, and a beautiful premium UI.
 
+> ✅ GitHub webhook integration verified — push events trigger AI-summarized commit feeds in real-time.
+
 ## 🐳 Quick Start (Docker)
 
 ```bash
