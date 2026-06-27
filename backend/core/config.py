@@ -31,6 +31,9 @@ class Settings(BaseSettings):
     # GitHub
     GITHUB_WEBHOOK_SECRET: str = ""
     GITHUB_TOKEN: str = ""
+    # Base URL of THIS backend service — used to build webhook payload URLs.
+    # Set this in Render: WEBHOOK_BASE_URL=https://projecthub-backend-wjnl.onrender.com
+    WEBHOOK_BASE_URL: str = ""
 
     # Email
     EMAIL_API_KEY: str = ""

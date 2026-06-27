@@ -33,7 +33,11 @@ from schemas.schemas import (
     MemberRoleUpdate,
     MemberOut,
 )
-from services.github_service import sync_repo_issues
+from services.github_service import (
+    sync_repo_issues,
+    register_github_webhook,
+    delete_github_webhook,
+)
 from services.activity_service import log_activity
 from utils.cache import cache, invalidate
 from models.activity import Activity
@@ -93,11 +97,12 @@ async def create_project(payload: ProjectCreate, current_user: CurrentUser, db: 
     await db.refresh(project)
     await invalidate(f"project_list:{current_user.id}")
 
-    # Trigger initial GitHub sync in background if repo_url provided
+    # Trigger initial GitHub sync + webhook registration in background if repo_url provided
     if project.repo_url:
         import asyncio
 
         asyncio.create_task(sync_repo_issues(str(project.id), project.repo_url))
+        asyncio.create_task(register_github_webhook(str(project.id), project.repo_url))
 
     return project
 
@@ -122,6 +127,7 @@ async def update_project(
     _=Depends(require_project_admin()),
 ):
     project = await _get_project_or_404(project_id, db)
+    old_repo_url = project.repo_url
     for field, value in payload.model_dump(exclude_none=True).items():
         if field == "deadline" and value:
             value = date.fromisoformat(value)
@@ -130,6 +136,19 @@ async def update_project(
     await db.refresh(project)
     await invalidate("project_list:*")
     await invalidate(f"project_analytics:{project_id}")
+
+    # Re-register GitHub webhook if the linked repo changed
+    new_repo_url = project.repo_url
+    if new_repo_url and new_repo_url != old_repo_url:
+        import asyncio
+
+        asyncio.create_task(register_github_webhook(project_id, new_repo_url))
+    elif old_repo_url and not new_repo_url:
+        # Repo unlinked — clean up the webhook
+        import asyncio
+
+        asyncio.create_task(delete_github_webhook(project_id, old_repo_url))
+
     return project
 
 

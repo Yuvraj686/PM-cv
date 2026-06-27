@@ -32,6 +32,24 @@ CurrentUser = Annotated[User, Depends(get_current_user)]
 DB = Annotated[AsyncSession, Depends(get_db)]
 
 
+@router.get("/webhook-url/{project_id}")
+async def get_webhook_url(
+    project_id: str,
+    current_user: CurrentUser,
+):
+    """Return the exact Payload URL to paste into GitHub webhook settings."""
+    base = settings.WEBHOOK_BASE_URL.rstrip("/")
+    if not base:
+        base = "https://projecthub-backend-wjnl.onrender.com"
+    url = f"{base}/api/github/webhook/{project_id}"
+    return {
+        "payload_url": url,
+        "content_type": "application/json",
+        "events": ["push", "pull_request", "issues"],
+        "note": "Paste 'payload_url' into GitHub → Repo Settings → Webhooks → Payload URL",
+    }
+
+
 @router.post("/webhook/{project_id}")
 async def github_webhook(
     project_id: str,
@@ -43,7 +61,10 @@ async def github_webhook(
 
     # Verify HMAC signature
     if settings.GITHUB_WEBHOOK_SECRET:
-        sig = (
+        # Reject immediately if GitHub didn't send the signature header at all
+        if not x_hub_signature_256:
+            raise ForbiddenError(message="Missing X-Hub-Signature-256 header")
+        expected_sig = (
             "sha256="
             + hmac.new(
                 settings.GITHUB_WEBHOOK_SECRET.encode(),
@@ -51,7 +72,7 @@ async def github_webhook(
                 hashlib.sha256,
             ).hexdigest()
         )
-        if not hmac.compare_digest(sig, x_hub_signature_256 or ""):
+        if not hmac.compare_digest(expected_sig, x_hub_signature_256):
             raise ForbiddenError(message="Invalid webhook signature")
 
     payload = json.loads(body)

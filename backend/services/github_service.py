@@ -10,6 +10,178 @@ logger = structlog.get_logger()
 GITHUB_API_TIMEOUT = httpx.Timeout(10.0, connect=5.0)
 
 
+# ---------------------------------------------------------------------------
+# Webhook registration helpers
+# ---------------------------------------------------------------------------
+
+
+async def register_github_webhook(project_id: str, repo_url: str) -> bool:
+    """
+    Register (or update) a GitHub webhook on the given repo so that GitHub
+    pushes events to our backend.
+
+    Requires:
+      - settings.GITHUB_TOKEN  — PAT with `admin:repo_hook` scope
+      - settings.WEBHOOK_BASE_URL — e.g. https://projecthub-backend-wjnl.onrender.com
+      - settings.GITHUB_WEBHOOK_SECRET — shared secret for HMAC verification
+
+    Returns True on success, False if registration was skipped or failed.
+    Errors are logged but never raised so they never crash the caller.
+    """
+    from core.config import settings
+
+    if not settings.GITHUB_TOKEN:
+        logger.warning(
+            "register_github_webhook_skipped",
+            reason="GITHUB_TOKEN not set",
+            project_id=project_id,
+        )
+        return False
+
+    if not settings.WEBHOOK_BASE_URL:
+        logger.warning(
+            "register_github_webhook_skipped",
+            reason="WEBHOOK_BASE_URL not set — set it in Render env vars",
+            project_id=project_id,
+        )
+        return False
+
+    # Parse owner/repo from URL like https://github.com/owner/repo
+    parts = repo_url.rstrip("/").split("/")
+    if len(parts) < 2:
+        logger.error(
+            "register_github_webhook_failed",
+            reason="Cannot parse owner/repo from repo_url",
+            repo_url=repo_url,
+        )
+        return False
+    owner, repo = parts[-2], parts[-1]
+
+    payload_url = (
+        f"{settings.WEBHOOK_BASE_URL.rstrip('/')}/api/github/webhook/{project_id}"
+    )
+    api_url = f"https://api.github.com/repos/{owner}/{repo}/hooks"
+    headers = {
+        "Accept": "application/vnd.github+json",
+        "Authorization": f"Bearer {settings.GITHUB_TOKEN}",
+        "X-GitHub-Api-Version": "2022-11-28",
+        "User-Agent": "ProjectHub-Webhook-Registrar",
+    }
+    hook_body = {
+        "name": "web",
+        "active": True,
+        "events": ["push", "pull_request", "issues"],
+        "config": {
+            "url": payload_url,
+            "content_type": "json",
+            "insecure_ssl": "0",
+            **(
+                {"secret": settings.GITHUB_WEBHOOK_SECRET}
+                if settings.GITHUB_WEBHOOK_SECRET
+                else {}
+            ),
+        },
+    }
+
+    async with httpx.AsyncClient(timeout=GITHUB_API_TIMEOUT) as client:
+        try:
+            # Try to create the hook
+            response = await client.post(api_url, json=hook_body, headers=headers)
+
+            if response.status_code == 422:
+                # Hook already exists — list existing hooks and update the one
+                # whose URL contains our project_id
+                list_resp = await client.get(api_url, headers=headers)
+                list_resp.raise_for_status()
+                existing_hooks = list_resp.json()
+                for hook in existing_hooks:
+                    if project_id in hook.get("config", {}).get("url", ""):
+                        hook_id = hook["id"]
+                        patch_resp = await client.patch(
+                            f"{api_url}/{hook_id}",
+                            json=hook_body,
+                            headers=headers,
+                        )
+                        patch_resp.raise_for_status()
+                        logger.info(
+                            "register_github_webhook_updated",
+                            project_id=project_id,
+                            hook_id=hook_id,
+                            payload_url=payload_url,
+                        )
+                        return True
+                # No existing hook found — log and move on
+                logger.warning(
+                    "register_github_webhook_conflict",
+                    project_id=project_id,
+                    detail=response.text[:200],
+                )
+                return False
+
+            response.raise_for_status()
+            hook_id = response.json().get("id")
+            logger.info(
+                "register_github_webhook_created",
+                project_id=project_id,
+                hook_id=hook_id,
+                payload_url=payload_url,
+            )
+            return True
+
+        except Exception as exc:
+            logger.error(
+                "register_github_webhook_error",
+                project_id=project_id,
+                repo_url=repo_url,
+                error=str(exc),
+            )
+            return False
+
+
+async def delete_github_webhook(project_id: str, repo_url: str) -> bool:
+    """Delete the ProjectHub webhook from GitHub when a repo is unlinked."""
+    from core.config import settings
+
+    if not settings.GITHUB_TOKEN:
+        return False
+
+    parts = repo_url.rstrip("/").split("/")
+    if len(parts) < 2:
+        return False
+    owner, repo = parts[-2], parts[-1]
+    api_url = f"https://api.github.com/repos/{owner}/{repo}/hooks"
+    headers = {
+        "Accept": "application/vnd.github+json",
+        "Authorization": f"Bearer {settings.GITHUB_TOKEN}",
+        "X-GitHub-Api-Version": "2022-11-28",
+        "User-Agent": "ProjectHub-Webhook-Registrar",
+    }
+
+    async with httpx.AsyncClient(timeout=GITHUB_API_TIMEOUT) as client:
+        try:
+            list_resp = await client.get(api_url, headers=headers)
+            list_resp.raise_for_status()
+            for hook in list_resp.json():
+                if project_id in hook.get("config", {}).get("url", ""):
+                    del_resp = await client.delete(
+                        f"{api_url}/{hook['id']}", headers=headers
+                    )
+                    del_resp.raise_for_status()
+                    logger.info(
+                        "delete_github_webhook_ok",
+                        project_id=project_id,
+                        hook_id=hook["id"],
+                    )
+                    return True
+        except Exception as exc:
+            logger.error(
+                "delete_github_webhook_error",
+                project_id=project_id,
+                error=str(exc),
+            )
+    return False
+
+
 async def fetch_github_issues(repo_url: str) -> list[dict]:
     """Fetch open issues from a GitHub repository."""
     logger.info("fetch_github_issues_started", repo_url=repo_url)
