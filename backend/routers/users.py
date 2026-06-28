@@ -1,11 +1,22 @@
 from typing import Annotated
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, func
 from core.database import get_db
 from core.dependencies import get_current_user
+from core.security import verify_password, hash_password
 from models.user import User
-from schemas.schemas import UserOut, UserUpdate, OnboardingSetup
+from models.project_member import ProjectMember
+from models.task import Task
+from schemas.schemas import (
+    UserOut,
+    UserUpdate,
+    OnboardingSetup,
+    ProfileOut,
+    ProfileUpdate,
+    PasswordChange,
+    DeleteAccountRequest,
+)
 from utils.exceptions import ConflictError
 
 router = APIRouter(prefix="/api/users", tags=["users"])
@@ -84,3 +95,92 @@ async def search_users(q: str, current_user: CurrentUser, db: DB):
         {"id": str(u.id), "name": u.name, "email": u.email, "avatar_url": u.avatar_url}
         for u in users
     ]
+
+
+# ─── Profile Endpoints ─────────────────────────────────────────────────────────
+
+
+@router.get("/me/profile", response_model=ProfileOut)
+async def get_full_profile(current_user: CurrentUser, db: DB):
+    """Return full profile including project count, task count, workspace count."""
+    # Count memberships (= workspaces/projects)
+    project_result = await db.execute(
+        select(func.count(ProjectMember.id)).where(
+            ProjectMember.user_id == current_user.id
+        )
+    )
+    project_count = project_result.scalar() or 0
+
+    # Count tasks assigned to user
+    task_result = await db.execute(
+        select(func.count(Task.id)).where(Task.assignee_id == current_user.id)
+    )
+    task_count = task_result.scalar() or 0
+
+    return ProfileOut(
+        id=current_user.id,
+        name=current_user.name,
+        username=current_user.username,
+        email=current_user.email,
+        avatar_url=current_user.avatar_url,
+        github_username=current_user.github_username,
+        onboarding_complete=current_user.onboarding_complete,
+        created_at=current_user.created_at,
+        project_count=project_count,
+        task_count=task_count,
+        workspace_count=project_count,  # workspaces == distinct projects joined
+    )
+
+
+@router.put("/me/profile", response_model=UserOut)
+async def update_full_profile(
+    payload: ProfileUpdate, current_user: CurrentUser, db: DB
+):
+    """Update display name only (email is not changeable)."""
+    current_user.name = payload.name
+    await db.commit()
+    await db.refresh(current_user)
+    return current_user
+
+
+@router.put("/me/password")
+async def change_password(payload: PasswordChange, current_user: CurrentUser, db: DB):
+    """Change password — verifies current password first, then saves new hash."""
+    # Must have a hashed password (email-auth users only)
+    if not current_user.hashed_password:
+        raise HTTPException(
+            status_code=400,
+            detail="Password change is not available for OAuth accounts.",
+        )
+
+    # Verify current password
+    if not verify_password(payload.current_password, current_user.hashed_password):
+        raise HTTPException(status_code=400, detail="Current password is incorrect.")
+
+    # Confirm new passwords match
+    if payload.new_password != payload.confirm_password:
+        raise HTTPException(status_code=400, detail="New passwords do not match.")
+
+    current_user.hashed_password = hash_password(payload.new_password)
+    await db.commit()
+    return {"message": "Password updated successfully."}
+
+
+@router.delete("/me")
+async def delete_account(
+    payload: DeleteAccountRequest, current_user: CurrentUser, db: DB
+):
+    """
+    Permanently delete the current user's account.
+    Requires the user to send confirmation='DELETE' in the request body.
+    All memberships and tasks assigned to the user are cascade-deleted by the DB.
+    """
+    if payload.confirmation != "DELETE":
+        raise HTTPException(
+            status_code=400,
+            detail='You must type "DELETE" to confirm account deletion.',
+        )
+
+    await db.delete(current_user)
+    await db.commit()
+    return {"message": "Account deleted successfully."}

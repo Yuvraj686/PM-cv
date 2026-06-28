@@ -54,6 +54,43 @@ class UserUpdate(BaseModel):
     avatar_url: str | None = None
 
 
+class ProfileOut(BaseModel):
+    id: UUID
+    name: str | None
+    username: str | None
+    email: str | None
+    avatar_url: str | None
+    github_username: str | None
+    onboarding_complete: bool
+    created_at: datetime
+    project_count: int = 0
+    task_count: int = 0
+    workspace_count: int = 0
+
+    model_config = {"from_attributes": True}
+
+
+class ProfileUpdate(BaseModel):
+    name: str = Field(..., min_length=1, max_length=100)
+
+
+class PasswordChange(BaseModel):
+    current_password: str = Field(..., min_length=1)
+    new_password: str = Field(..., min_length=8, max_length=72)
+    confirm_password: str = Field(..., min_length=8)
+
+    @field_validator("new_password")
+    @classmethod
+    def password_strength(cls, v: str) -> str:
+        if len(v) < 8:
+            raise ValueError("Password must be at least 8 characters")
+        return v
+
+
+class DeleteAccountRequest(BaseModel):
+    confirmation: str  # must equal "DELETE"
+
+
 class OnboardingSetup(BaseModel):
     username: str
     github_username: str | None = None

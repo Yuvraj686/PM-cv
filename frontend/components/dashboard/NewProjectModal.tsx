@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Loader2, Sparkles } from 'lucide-react';
+import { X, Loader2, Sparkles, FolderPlus, Link2, CalendarDays, FileText } from 'lucide-react';
 import api from '@/lib/api';
 import { toast } from 'sonner';
 import { GenerateTasksModal } from '@/components/ai/GenerateTasksModal';
@@ -95,102 +95,148 @@ export function NewProjectModal({ isOpen, onClose, onSuccess }: NewProjectModalP
       <AnimatePresence>
         {isOpen && !aiModalOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            {/* Backdrop */}
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={onClose}
-              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+              className="absolute inset-0 bg-[#1C1C1C]/30 backdrop-blur-[2px]"
             />
 
+            {/* Modal */}
             <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              initial={{ opacity: 0, scale: 0.97, y: 16 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="relative w-full max-w-lg bg-[#1A1D24] border border-white/10 rounded-2xl shadow-2xl overflow-hidden"
+              exit={{ opacity: 0, scale: 0.97, y: 16 }}
+              transition={{ duration: 0.2, ease: 'easeOut' }}
+              className="relative w-full max-w-lg bg-white border border-[#E8E4DD] rounded-2xl shadow-[0_8px_40px_rgba(28,28,28,0.12)] overflow-hidden"
             >
-              <div className="flex items-center justify-between p-6 border-b border-white/5">
-                <h2 className="text-xl font-bold font-geist tracking-tight">Create New Project</h2>
-                <button onClick={onClose} className="text-gray-400 hover:text-white transition-colors">
-                  <X size={20} />
+              {/* Header */}
+              <div className="flex items-center justify-between px-6 py-5 border-b border-[#E8E4DD]">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-xl bg-[#FDEEE9] flex items-center justify-center">
+                    <FolderPlus className="w-4.5 h-4.5 text-[#E07A5F]" size={18} />
+                  </div>
+                  <h2
+                    className="text-lg font-bold text-[#1C1C1C]"
+                    style={{ fontFamily: "'Lora', Georgia, serif" }}
+                  >
+                    Create New Project
+                  </h2>
+                </div>
+                <button
+                  onClick={onClose}
+                  className="w-8 h-8 flex items-center justify-center rounded-lg text-[#8A8178] hover:bg-[#F7F4EF] hover:text-[#1C1C1C] transition-all"
+                >
+                  <X size={17} />
                 </button>
               </div>
 
-              <form onSubmit={handleSubmit} className="p-6 space-y-4">
+              {/* Form */}
+              <form onSubmit={handleSubmit} className="px-6 py-5 space-y-4">
                 {error && (
-                  <div className="p-3 bg-red-500/10 border border-red-500/20 text-red-400 rounded-lg text-sm text-center">
+                  <div className="px-4 py-3 bg-[#FDEEE9] border border-[#E07A5F]/30 text-[#c45f46] rounded-xl text-sm text-center">
                     {error}
                   </div>
                 )}
 
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-gray-300">Project Name</label>
+                {/* Project Name */}
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium text-[#1C1C1C]">Project Name</label>
                   <input
                     required
                     type="text"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     placeholder="e.g. Q3 Mobile App Revamp"
-                    className="w-full bg-black/20 border border-white/10 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all text-white"
+                    className="w-full bg-[#F7F4EF] border border-[#E8E4DD] rounded-xl px-4 py-2.5 text-sm text-[#1C1C1C] placeholder-[#8A8178] outline-none focus:border-[#E07A5F] focus:ring-2 focus:ring-[#E07A5F]/15 transition-all"
+                    style={{ fontFamily: "'Inter', sans-serif" }}
                   />
                 </div>
 
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-gray-300">Description</label>
+                {/* Description */}
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium text-[#1C1C1C]">
+                    <span className="flex items-center gap-1.5">
+                      <FileText size={13} className="text-[#8A8178]" />
+                      Description
+                    </span>
+                  </label>
                   <textarea
                     rows={3}
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
                     placeholder="What is this project about?"
-                    className="w-full bg-black/20 border border-white/10 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all text-white resize-none"
+                    className="w-full bg-[#F7F4EF] border border-[#E8E4DD] rounded-xl px-4 py-2.5 text-sm text-[#1C1C1C] placeholder-[#8A8178] outline-none focus:border-[#E07A5F] focus:ring-2 focus:ring-[#E07A5F]/15 transition-all resize-none"
+                    style={{ fontFamily: "'Inter', sans-serif" }}
                   />
                 </div>
 
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-gray-300">Repository URL (Optional)</label>
+                {/* Repo URL */}
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium text-[#1C1C1C]">
+                    <span className="flex items-center gap-1.5">
+                      <Link2 size={13} className="text-[#8A8178]" />
+                      Repository URL
+                      <span className="text-xs font-normal text-[#8A8178]">(Optional)</span>
+                    </span>
+                  </label>
                   <input
                     type="url"
                     value={repoUrl}
                     onChange={(e) => setRepoUrl(e.target.value)}
                     placeholder="https://github.com/org/repo"
-                    className="w-full bg-black/20 border border-white/10 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all text-white"
+                    className="w-full bg-[#F7F4EF] border border-[#E8E4DD] rounded-xl px-4 py-2.5 text-sm text-[#1C1C1C] placeholder-[#8A8178] outline-none focus:border-[#E07A5F] focus:ring-2 focus:ring-[#E07A5F]/15 transition-all"
+                    style={{ fontFamily: "'Inter', sans-serif" }}
                   />
                 </div>
 
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-gray-300">Deadline (Optional)</label>
+                {/* Deadline */}
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium text-[#1C1C1C]">
+                    <span className="flex items-center gap-1.5">
+                      <CalendarDays size={13} className="text-[#8A8178]" />
+                      Deadline
+                      <span className="text-xs font-normal text-[#8A8178]">(Optional)</span>
+                    </span>
+                  </label>
                   <input
                     type="date"
                     value={deadline}
                     onChange={(e) => setDeadline(e.target.value)}
-                    className="w-full bg-black/20 border border-white/10 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all text-white [color-scheme:dark]"
+                    className="w-full bg-[#F7F4EF] border border-[#E8E4DD] rounded-xl px-4 py-2.5 text-sm text-[#1C1C1C] outline-none focus:border-[#E07A5F] focus:ring-2 focus:ring-[#E07A5F]/15 transition-all [color-scheme:light]"
+                    style={{ fontFamily: "'Inter', sans-serif" }}
                   />
                 </div>
 
-                <div className="pt-4 flex flex-col gap-2">
-                  <div className="flex items-center space-x-3">
+                {/* Actions */}
+                <div className="pt-2 flex flex-col gap-2.5">
+                  <div className="flex items-center gap-2.5">
                     <button
                       type="button"
                       onClick={onClose}
-                      className="flex-1 px-4 py-2.5 border border-white/10 rounded-lg text-sm font-medium text-gray-400 hover:bg-white/5 transition-all"
+                      className="flex-1 px-4 py-2.5 border border-[#E8E4DD] rounded-xl text-sm font-medium text-[#8A8178] hover:bg-[#F7F4EF] hover:text-[#1C1C1C] hover:border-[#d0cbc4] transition-all"
                     >
                       Cancel
                     </button>
                     <button
                       type="submit"
                       disabled={loading}
-                      className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2.5 rounded-lg transition-all shadow-[0_0_15px_rgba(99,102,241,0.3)] flex items-center justify-center disabled:opacity-50"
+                      className="flex-1 bg-[#1C1C1C] hover:bg-[#333] text-white font-semibold py-2.5 rounded-xl text-sm transition-all shadow-sm flex items-center justify-center gap-2 disabled:opacity-50"
                     >
-                      {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Create Project'}
+                      {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Create Project'}
                     </button>
                   </div>
+
+                  {/* AI Generate button */}
                   <button
                     type="button"
                     disabled={loading || !name.trim()}
                     onClick={handleGenerateWithAI}
-                    className="w-full flex items-center justify-center gap-2 px-4 py-2.5 border border-indigo-500/40 rounded-lg text-sm font-medium text-indigo-300 hover:bg-indigo-500/10 transition-all disabled:opacity-50"
+                    className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-[#FDEEE9] border border-[#E07A5F]/30 rounded-xl text-sm font-medium text-[#E07A5F] hover:bg-[#fbe4da] hover:border-[#E07A5F]/50 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
                   >
-                    <Sparkles size={16} />
+                    <Sparkles size={15} />
                     ✨ Generate tasks with AI
                   </button>
                 </div>

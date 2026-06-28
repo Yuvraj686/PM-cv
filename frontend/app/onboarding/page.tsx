@@ -86,51 +86,73 @@ export default function OnboardingPage() {
 
   const statusIcon = () => {
     if (usernameStatus === 'checking')
-      return <Loader2 className="w-4 h-4 text-indigo-400 animate-spin" />;
+      return <Loader2 className="w-4 h-4 text-[#E07A5F] animate-spin" />;
     if (usernameStatus === 'available')
-      return <CheckCircle className="w-4 h-4 text-emerald-400" />;
+      return <CheckCircle className="w-4 h-4 text-[#8DB88A]" />;
     if (usernameStatus === 'taken' || usernameStatus === 'invalid')
-      return <XCircle className="w-4 h-4 text-red-400" />;
+      return <XCircle className="w-4 h-4 text-[#c45f46]" />;
     return null;
   };
 
   const statusColor = () => {
-    if (usernameStatus === 'available') return 'text-emerald-400';
-    if (usernameStatus === 'taken' || usernameStatus === 'invalid') return 'text-red-400';
-    return 'text-slate-400';
+    if (usernameStatus === 'available') return 'text-[#4a8a46]';
+    if (usernameStatus === 'taken' || usernameStatus === 'invalid') return 'text-[#c45f46]';
+    return 'text-[#8A8178]';
+  };
+
+  const inputBorder = () => {
+    if (usernameStatus === 'available') return 'border-[#8DB88A] focus:ring-[#8DB88A]/20';
+    if (usernameStatus === 'taken' || usernameStatus === 'invalid')
+      return 'border-[#E07A5F]/60 focus:ring-[#E07A5F]/15';
+    return 'border-[#E8E4DD] focus:border-[#E07A5F] focus:ring-[#E07A5F]/15';
   };
 
   const canSubmit = usernameStatus === 'available' && !submitting;
 
   return (
-    <div className="min-h-screen bg-[#0a0d14] flex items-center justify-center p-4 relative overflow-hidden">
-      {/* Ambient glow blobs */}
-      <div className="absolute top-0 left-1/4 w-[500px] h-[500px] bg-indigo-600/10 rounded-full blur-[120px] pointer-events-none" />
-      <div className="absolute bottom-0 right-1/4 w-[400px] h-[400px] bg-violet-600/10 rounded-full blur-[120px] pointer-events-none" />
+    <div
+      className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden"
+      style={{ backgroundColor: '#F7F4EF', fontFamily: "'Inter', sans-serif" }}
+    >
+      {/* Subtle decorative blobs */}
+      <div
+        className="absolute top-0 left-1/4 w-[480px] h-[480px] rounded-full pointer-events-none"
+        style={{ background: 'radial-gradient(circle, #FDEEE9 0%, transparent 70%)', opacity: 0.7 }}
+      />
+      <div
+        className="absolute bottom-0 right-1/4 w-[380px] h-[380px] rounded-full pointer-events-none"
+        style={{ background: 'radial-gradient(circle, #EDF4EC 0%, transparent 70%)', opacity: 0.6 }}
+      />
 
       <div className="w-full max-w-md relative z-10">
-        {/* Header card */}
+        {/* Header */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-600 mb-5 shadow-lg shadow-indigo-500/30">
+          {/* Icon */}
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-[#E07A5F] to-[#c45f46] mb-5 shadow-lg shadow-[#E07A5F]/20">
             <Sparkles className="w-8 h-8 text-white" />
           </div>
-          <h1 className="text-3xl font-bold text-white mb-2">Welcome aboard! 🎉</h1>
-          <p className="text-slate-400 text-base">
+          <h1
+            className="text-3xl font-bold text-[#1C1C1C] mb-2"
+            style={{ fontFamily: "'Lora', Georgia, serif" }}
+          >
+            Welcome aboard! 🎉
+          </h1>
+          <p className="text-[#8A8178] text-base">
             Just a couple of details before you dive in.
           </p>
         </div>
 
         {/* Form card */}
-        <div className="bg-[#13172a]/80 border border-white/[0.08] rounded-2xl p-8 shadow-2xl backdrop-blur-sm">
+        <div className="bg-white border border-[#E8E4DD] rounded-2xl p-8 shadow-[0_4px_24px_rgba(28,28,28,0.07)]">
           <form onSubmit={handleSubmit} className="space-y-6">
 
             {/* Username field */}
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">
-                Choose your username <span className="text-red-400">*</span>
+              <label className="block text-sm font-medium text-[#1C1C1C] mb-2">
+                Choose your username <span className="text-[#E07A5F]">*</span>
               </label>
               <div className="relative">
-                <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500 font-medium select-none">@</span>
+                <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#8A8178] font-medium select-none text-sm">@</span>
                 <input
                   id="username-input"
                   type="text"
@@ -139,10 +161,7 @@ export default function OnboardingPage() {
                   placeholder="your_username"
                   maxLength={30}
                   required
-                  className={`w-full pl-9 pr-10 py-3 rounded-xl bg-[#0f1220] border text-white placeholder-slate-600 text-sm transition-all outline-none focus:ring-2
-                    ${usernameStatus === 'available' ? 'border-emerald-500/50 focus:ring-emerald-500/20' :
-                      usernameStatus === 'taken' || usernameStatus === 'invalid' ? 'border-red-500/50 focus:ring-red-500/20' :
-                      'border-white/10 focus:ring-indigo-500/30 focus:border-indigo-500/50'}`}
+                  className={`w-full pl-9 pr-10 py-3 rounded-xl bg-[#F7F4EF] border text-[#1C1C1C] placeholder-[#8A8178] text-sm transition-all outline-none focus:ring-2 ${inputBorder()}`}
                 />
                 <span className="absolute right-3.5 top-1/2 -translate-y-1/2">
                   {statusIcon()}
@@ -153,25 +172,25 @@ export default function OnboardingPage() {
                   {usernameMessage}
                 </p>
               )}
-              <p className="mt-1.5 text-xs text-slate-600">
+              <p className="mt-1.5 text-xs text-[#8A8178]">
                 This is how others will find and mention you on ProjectHub.
               </p>
             </div>
 
             {/* Divider */}
             <div className="flex items-center gap-3">
-              <div className="flex-1 h-px bg-white/[0.06]" />
-              <span className="text-xs text-slate-600 uppercase tracking-widest">Optional</span>
-              <div className="flex-1 h-px bg-white/[0.06]" />
+              <div className="flex-1 h-px bg-[#E8E4DD]" />
+              <span className="text-xs text-[#8A8178] uppercase tracking-widest font-medium">Optional</span>
+              <div className="flex-1 h-px bg-[#E8E4DD]" />
             </div>
 
             {/* GitHub username field */}
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">
+              <label className="block text-sm font-medium text-[#1C1C1C] mb-2">
                 GitHub username
               </label>
               <div className="relative">
-                <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500">
+                <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#8A8178]">
                   <Github className="w-4 h-4" />
                 </span>
                 <input
@@ -181,18 +200,18 @@ export default function OnboardingPage() {
                   onChange={(e) => setGithubHandle(e.target.value)}
                   placeholder="octocat"
                   maxLength={39}
-                  className="w-full pl-10 pr-4 py-3 rounded-xl bg-[#0f1220] border border-white/10 text-white placeholder-slate-600 text-sm transition-all outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500/50"
+                  className="w-full pl-10 pr-4 py-3 rounded-xl bg-[#F7F4EF] border border-[#E8E4DD] text-[#1C1C1C] placeholder-[#8A8178] text-sm transition-all outline-none focus:ring-2 focus:border-[#E07A5F] focus:ring-[#E07A5F]/15"
                 />
               </div>
-              <p className="mt-1.5 text-xs text-slate-600">
+              <p className="mt-1.5 text-xs text-[#8A8178]">
                 Linking your GitHub lets ProjectHub pull commits and repos automatically.
               </p>
             </div>
 
             {/* Error message */}
             {error && (
-              <div className="p-3.5 bg-red-500/10 border border-red-500/20 rounded-xl">
-                <p className="text-red-400 text-sm">{error}</p>
+              <div className="px-4 py-3.5 bg-[#FDEEE9] border border-[#E07A5F]/30 rounded-xl">
+                <p className="text-[#c45f46] text-sm">{error}</p>
               </div>
             )}
 
@@ -203,8 +222,8 @@ export default function OnboardingPage() {
               disabled={!canSubmit}
               className={`w-full flex items-center justify-center gap-2 py-3.5 px-6 rounded-xl font-semibold text-sm transition-all duration-200
                 ${canSubmit
-                  ? 'bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white shadow-lg shadow-indigo-500/25 hover:shadow-indigo-500/40 hover:scale-[1.01] active:scale-100'
-                  : 'bg-white/5 text-slate-600 cursor-not-allowed border border-white/5'}`}
+                  ? 'bg-[#1C1C1C] hover:bg-[#333] text-white shadow-sm hover:shadow-md hover:scale-[1.01] active:scale-100'
+                  : 'bg-[#F0EDE8] text-[#8A8178] cursor-not-allowed border border-[#E8E4DD]'}`}
             >
               {submitting ? (
                 <>
@@ -223,11 +242,13 @@ export default function OnboardingPage() {
 
         {/* Step indicator */}
         <div className="flex items-center justify-center gap-2 mt-6">
-          <div className="w-2 h-2 rounded-full bg-indigo-500" />
-          <div className="w-6 h-1 rounded-full bg-indigo-500" />
-          <div className="w-2 h-2 rounded-full bg-white/20" />
+          <div className="w-2 h-2 rounded-full bg-[#E07A5F]" />
+          <div className="w-6 h-1 rounded-full bg-[#E07A5F]" />
+          <div className="w-2 h-2 rounded-full bg-[#E8E4DD]" />
         </div>
-        <p className="text-center text-xs text-slate-600 mt-3">Step 1 of 1 — you can always change this later in settings.</p>
+        <p className="text-center text-xs text-[#8A8178] mt-3">
+          Step 1 of 1 — you can always change this later in settings.
+        </p>
       </div>
     </div>
   );

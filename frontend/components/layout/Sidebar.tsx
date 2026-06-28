@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation';
 
 import { useAuthStore } from '@/lib/store';
 import { clearTokens } from '@/lib/auth';
-import { LogOut, Plus } from 'lucide-react';
+import { LogOut, Plus, UserCog } from 'lucide-react';
 
 const AVATAR_COLORS = [
   '#E07A5F','#8DB88A','#C9A84C','#9B8EC4','#7A8FA6',
@@ -176,35 +176,54 @@ export function Sidebar({ secondaryNavItems, projects = [] }: SidebarProps) {
 
         {/* Footer */}
         <div
-          className="p-3 shrink-0 flex items-center gap-2"
+          className="p-3 shrink-0"
           style={{ borderTop: '1px solid var(--bloom-border)' }}
         >
-          <div
-            className="w-8 h-8 rounded-full flex items-center justify-center text-white font-semibold text-sm shrink-0"
-            style={{ background: bg }}
-          >
-            {initial}
-          </div>
-          {!collapsed && (
-            <>
-              <div className="flex-1 min-w-0">
-                <p className="text-xs font-semibold truncate" style={{ color: 'var(--bloom-text)' }}>
-                  {user?.name || 'User'}
-                </p>
-                <p className="text-[10px] truncate" style={{ color: 'var(--bloom-muted)' }}>
-                  {user?.email || ''}
-                </p>
-              </div>
-              <button
-                onClick={handleLogout}
-                title="Logout"
-                className="p-1.5 rounded-lg hover:bg-black/5 transition-colors"
-                style={{ color: 'var(--bloom-muted)' }}
+          {/* User info row */}
+          <div className="flex items-center gap-2">
+            <Link
+              href="/profile"
+              title="Account Settings"
+              className="flex items-center gap-2 flex-1 min-w-0 rounded-xl px-1 py-1 hover:bg-[var(--bloom-coral-bg)] transition-all group"
+            >
+              <div
+                className="w-8 h-8 rounded-full flex items-center justify-center text-white font-semibold text-sm shrink-0"
+                style={{ background: bg }}
               >
-                <LogOut size={14} />
-              </button>
-            </>
-          )}
+                {initial}
+              </div>
+              {!collapsed && (
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-semibold truncate group-hover:text-[var(--bloom-coral)] transition-colors" style={{ color: 'var(--bloom-text)' }}>
+                    {user?.name || 'User'}
+                  </p>
+                  <p className="text-[10px] truncate" style={{ color: 'var(--bloom-muted)' }}>
+                    {user?.email || ''}
+                  </p>
+                </div>
+              )}
+            </Link>
+            {!collapsed && (
+              <div className="flex items-center gap-0.5 shrink-0">
+                <Link
+                  href="/profile"
+                  title="Account Settings"
+                  className="p-1.5 rounded-lg hover:bg-black/5 transition-colors"
+                  style={{ color: 'var(--bloom-muted)' }}
+                >
+                  <UserCog size={13} />
+                </Link>
+                <button
+                  onClick={handleLogout}
+                  title="Logout"
+                  className="p-1.5 rounded-lg hover:bg-black/5 transition-colors"
+                  style={{ color: 'var(--bloom-muted)' }}
+                >
+                  <LogOut size={13} />
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </aside>
     </>
